@@ -3,6 +3,7 @@ import os
 from bm25_search_engine.bm25.bm25 import BM25
 from bm25_search_engine.bm25.preprocess import preprocess_text
 from bm25_search_engine.bm25.file_handlers import read_text_file, extract_text_from_pdf
+from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -24,6 +25,7 @@ def index():
         if 'files' in request.files:
             files = request.files.getlist('files')
             corpus = []
+            documents_content = []
             for file in files:
                 if file.filename == '':
                     continue
@@ -58,17 +60,42 @@ def index():
                 for doc_index, score in ranked_docs:
                     # Extract matching sections
                     matching_sections = highlight_matches(filtered_corpus[doc_index], query)
+
+                     # Generate paraphrased response
+                    paraphrased_response = paraphrase(query, " ".join(matching_sections))
+
                     results.append({
                         'doc_index': doc_index,
                         'score': score,
                         'content': filtered_corpus[doc_index],
-                        'matching_sections': matching_sections
+                        'matching_sections': matching_sections,
+                        'paraphrased_response': paraphrased_response
                     })
                 return render_template('index.html', results=results, query=query, uploaded_files=uploaded_files)
             else:
                 return render_template('index.html', error="No documents uploaded yet.", uploaded_files=uploaded_files)
 
     return render_template('index.html', uploaded_files=uploaded_files)
+
+# Load pre-trained T5 model and tokenizer
+model_name = "t5-small"
+tokenizer = T5Tokenizer.from_pretrained(model_name)
+model = T5ForConditionalGeneration.from_pretrained(model_name)
+
+def paraphrase(query, context, max_input_length=512, max_output_length=200):
+    """
+    Generate a paraphrased response using T5.
+    :param query: The user's query.
+    :param context: The context (matching sections from the documents).
+    :param max_input_length: Maximum length of the input sequence (default: 512).
+    :param max_output_length: Maximum length of the output sequence (default: 200).
+    :return: Paraphrased response.
+    """
+    input_text = f"paraphrase: {query} based on {context}"
+    inputs = tokenizer.encode(input_text, return_tensors="pt", max_length=max_input_length, truncation=True)
+    outputs = model.generate(inputs, max_length=max_output_length, num_return_sequences=1)
+    paraphrased_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return paraphrased_text
 
 def highlight_matches(text, query):
     """
