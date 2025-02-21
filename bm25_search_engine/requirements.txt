@@ -1,0 +1,4 @@
+nltk
+pdfplumber
+beautifulsoup4
+requests

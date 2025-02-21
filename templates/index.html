@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BM25 Search Engine</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>BM25 Search Engine</h1>
+
+    <!-- File Upload Form -->
+    <form method="POST" enctype="multipart/form-data">
+        <h2>Upload Documents</h2>
+        <input type="file" name="files" id="file-input" multiple accept=".txt,.pdf">
+        <button type="submit">Upload</button>
+    </form>
+
+    <!-- Display Selected Files -->
+    <div id="selected-files">
+        <h2>Selected Files</h2>
+        <ul id="file-list"></ul>
+    </div>
+
+    <!-- Sources Section -->
+    <div id="sources">
+        <h2>Sources</h2>
+        <form method="POST">
+            <ul>
+                {% for file in uploaded_files %}
+                    <li>
+                        <input type="checkbox" name="selected_files" value="{{ file.name }}" id="file-{{ loop.index }}">
+                        <label for="file-{{ loop.index }}">{{ file.name }}</label>
+                        <pre>{{ file.content[:200] }}...</pre>  <!-- Display first 200 characters -->
+                    </li>
+                {% endfor %}
+            </ul>
+            <h2>Search</h2>
+            <input type="text" name="query" placeholder="Enter your query" required>
+            <button type="submit">Search</button>
+        </form>
+    </div>
+
+    <!-- Display Results -->
+{% if results %}
+<h2>Results for "{{ query }}"</h2>
+<ul>
+    {% for result in results %}
+        <li>
+            <h3>Document {{ result.doc_index }} (Score: {{ "%.4f"|format(result.score) }})</h3>
+            <h4>Matching Sections:</h4>
+            <ul>
+                {% for section in result.matching_sections %}
+                    <li>{{ section | safe }}</li>  <!-- Use `safe` to render HTML -->
+                {% endfor %}
+            </ul>
+            <h4>Paraphrased Response:</h4>
+            <p>{{ result.paraphrased_response }}</p>
+        </li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+    <!-- Display Errors -->
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <!-- JavaScript to Display Selected Files -->
+    <script>
+        document.getElementById('file-input').addEventListener('change', function(event) {
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = '';  // Clear previous list
+
+            const files = event.target.files;
+            for (const file of files) {
+                const listItem = document.createElement('li');
+                listItem.textContent = file.name;
+                fileList.appendChild(listItem);
+            }
+        });
+    </script>
+</body>
+</html>
