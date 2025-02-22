@@ -2,9 +2,9 @@
 
 This project implements a BM25 search engine with  paraphrasing capabilities. It allows users to upload documents, search for relevant sections using BM25, and generate paraphrased responses for queries.
 
----
 
-     Table of Contents
+
+Table of Contents
 1. [How It Works](  how-it-works)
 2. [Features](  features)
 3. [Libraries and Requirements](  libraries-and-requirements)
@@ -14,9 +14,8 @@ This project implements a BM25 search engine with  paraphrasing capabilities. It
 7. [File Structure](  file-structure)
 
 
----
 
-     How It Works
+How It Works
 
 The BM25 search engine works as follows:
 1.   Document Upload: Users upload `.txt` or `.pdf` files to build a searchable corpus.
@@ -25,16 +24,14 @@ The BM25 search engine works as follows:
 4.   Paraphrasing: The matching sections are passed to a paraphrasing model (e.g., T5) to generate a paraphrased response.
 5.   Results Display: The matching sections and paraphrased responses are displayed in the UI.
 
----
 
-     Features
+Features
 
 -   Document Upload  : Upload `.txt` and `.pdf` files to build a searchable corpus.
 -   BM25 Search  : Rank documents based on relevance to a user query using the BM25 algorithm.
 -   Paraphrasing  : Generate paraphrased responses for queries using advanced language models.
 -   Dynamic UI  : Display uploaded files, matching sections, and paraphrased responses in a user-friendly interface.
 
----
 
 Libraries and Requirements
 
@@ -46,7 +43,6 @@ Python Libraries
 -   SentencePiece  : Required for tokenization in T5.
 -   Torch  : Required for running models like T5.
 
----
 
 Installation
 
@@ -134,4 +130,4 @@ bm25_search_engine/
 │
 ├── requirements.txt              List of dependencies
 │
-└── README.md                     Project documentatio
+└── README.md                     Project documentation
