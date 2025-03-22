@@ -48,3 +48,4 @@ class BM25:
             score = self._compute_bm25_score(query_terms, i)
             scores.append((i, score))
         return sorted(scores, key=lambda x: x[1], reverse=True)
+
