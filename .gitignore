@@ -14,6 +14,9 @@ logs/
 results/
 fine-tuned-distilbart/
 
+#Ingore uploads
+uploads/
+
 # Ignore system/IDE files
 .DS_Store
 *.swp
