@@ -2,70 +2,95 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Signup</title>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Madimi+One&family=Sevillana&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
   </head>
   <body class="welcomepage">
-    <h1>Signup</h1>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <img id="logo" src="{{ url_for('static', filename='logo.png') }}" /><br />
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-toggle="collapse"
+        data-target="#navbarNavAltMarkup"
+        aria-controls="navbarNavAltMarkup"
+        aria-expanded="true"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+        <div class="navbar-nav">
+          <a class="nav-item nav-link active" href="#">About</a>
+        </div>
+      </div>
+    </nav>
+    <div id="login-container">
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %}
+      <ul class="flashes">
+        {% for category, message in messages %}
+        <li class="flash {{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %} {% endwith %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %} {% if
-    messages %}
-    <ul class="flashes">
-      {% for category, message in messages %}
-      <li class="flash {{ category }}">{{ message }}</li>
-      {% endfor %}
-    </ul>
-    {% endif %} {% endwith %}
+      <form id="welcome" method="POST" action="{{ url_for('signup') }}">
+        {{ form.hidden_tag() }} {{ form.firstname.label }} {{
+        form.firstname(size=32, placeholder='Enter First Name') }} {{
+        form.lastname.label }}
+        <br />
+        {{ form.lastname(size=32, placeholder='Enter Last Name') }}
 
-    <form method="POST" action="{{ url_for('signup') }}">
-      {{ form.hidden_tag() }} {{ form.firstname.label }}
-      <br />
-      {{ form.firstname(size=32, placeholder='Enter First Name') }} {{
-      form.lastname.label }}
-      <br />
-      {{ form.lastname(size=32, placeholder='Enter Last Name') }}
+        <br />
 
-      <br />
+        {% for error in form.firstname.errors %}
+        <span style="color: red">{{ error }}</span>
 
-      {% for error in form.firstname.errors %}
-      <span style="color: red">{{ error }}</span>
+        <br />
+        {% endfor %}
 
-      <br />
-      {% endfor %}
+        <br />
 
-      <br />
+        {% for error in form.lastname.errors %}
+        <span style="color: red">{{ error }}</span>
 
-      {% for error in form.lastname.errors %}
-      <span style="color: red">{{ error }}</span>
+        {% endfor %} {{ form.email.label }} {{ form.email(size=32,
+        placeholder='Enter Email') }} {% for error in form.email.errors %}
+        <span style="color: red">{{ error }}</span>
 
-      <br />
-      {% endfor %} {{ form.email.label }}
-      <br />
-      {{ form.email(size=32, placeholder='Enter Email') }}
+        {% endfor %} {{ form.password.label }} {{ form.password(size=32,
+        placeholder='Enter Password') }}
+        <br />
 
-      <br />
-      {% for error in form.email.errors %}
-      <span style="color: red">{{ error }}</span>
+        {% for error in form.password.errors %}
+        <span style="color: red">{{ error }}</span>
 
-      <br />
-      {% endfor %} {{ form.password.label }}
+        <br />
+        {% endfor %} {{ form.submit() }}
+      </form>
 
-      <br />
-      {{ form.password(size=32, placeholder='Enter Password') }}
-      <br />
-
-      {% for error in form.password.errors %}
-      <span style="color: red">{{ error }}</span>
-
-      <br />
-      {% endfor %} {{ form.submit() }}
-    </form>
-
-    <p>
-      Already have an account? <a href="{{ url_for('login_view') }}">Login</a>
-    </p>
+      <p id="already">
+        Already have an account?
+        <a href="{{ url_for('login_view') }}" id="login">Login</a>
+      </p>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
