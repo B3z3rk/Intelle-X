@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login</title>
+    <title>Signup</title>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
@@ -20,7 +20,6 @@
       href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
     />
   </head>
-
   <body class="welcomepage">
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
       <img id="logo" src="{{ url_for('static', filename='logo.png') }}" /><br />
@@ -51,32 +50,45 @@
       </ul>
       {% endif %} {% endwith %}
 
-      <h1>GET STARTED</h1>
-
-      <form id="welcome" method="POST" action="{{ url_for('login_view') }}">
-        {{ form.hidden_tag() }} {{ form.email.label }}
+      <form id="welcome" method="POST" action="{{ url_for('signup') }}">
+        {{ form.hidden_tag() }} {{ form.firstname.label }} {{
+        form.firstname(size=32, placeholder='Enter First Name') }} {{
+        form.lastname.label }}
+        <br />
+        {{ form.lastname(size=32, placeholder='Enter Last Name') }}
 
         <br />
 
-        {{ form.email(size=32, placeholder='Enter Email') }}
+        {% for error in form.firstname.errors %}
+        <span style="color: red">{{ error }}</span>
+
+        <br />
+        {% endfor %}
 
         <br />
 
-        {% for error in form.email.errors %}
-        <span style="color: red">{{ error }}</span><br />
-        {% endfor %} {{ form.password.label }}
+        {% for error in form.lastname.errors %}
+        <span style="color: red">{{ error }}</span>
 
-        <br />
+        {% endfor %} {{ form.email.label }} {{ form.email(size=32,
+        placeholder='Enter Email') }} {% for error in form.email.errors %}
+        <span style="color: red">{{ error }}</span>
 
-        {{ form.password(size=32, placeholder='Enter Password') }}
-
+        {% endfor %} {{ form.password.label }} {{ form.password(size=32,
+        placeholder='Enter Password') }}
         <br />
 
         {% for error in form.password.errors %}
-        <span style="color: red">{{ error }}</span><br />
-        {% endfor %} {{form.submit() }}
+        <span style="color: red">{{ error }}</span>
+
+        <br />
+        {% endfor %} {{ form.submit() }}
       </form>
-      <a id="signup" href="{{ url_for('signup') }}">Signup</a>
+
+      <p id="already">
+        Already have an account?
+        <a href="{{ url_for('login_view') }}" id="login">Login</a>
+      </p>
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>

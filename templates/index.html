@@ -19,243 +19,137 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
     />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+      defer
+    ></script>
   </head>
   <body>
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar">
+      <button id="close-btn" class="btn btn-danger">&times;</button>
+      <h2 class="text-white">Menu</h2>
+      <ul class="list-unstyled">
+        <li><a href="#" class="text-white">Home</a></li>
+        <li><a href="#" class="text-white">Saved Results</a></li>
+        <li><a href="#" class="text-white">Profile</a></li>
+        <li><a href="{{ url_for('logout') }}" class="text-white">Logout</a></li>
+      </ul>
+    </div>
+
     <!-- Header with Geometric Shape -->
-    <header>
+    <header class="header d-flex align-items-center">
       <img src="{{ url_for('static', filename='logo.png') }}" />
     </header>
 
-    <i class="fa-regular fa-bookmark" title="Save results"></i>
-    <i class="fa-solid fa-floppy-disk" title="Retrieve saved results"></i>
-    <i class="fa-solid fa-share-from-square" title="Share results"></i>
-    <!-- File Upload Section -->
-    <form method="POST" enctype="multipart/form-data">
-      <div id="file-upload-container">
-        <div
-          id="file-drop-area"
-          ondrop="handleFileDrop(event)"
-          ondragover="allowDrop(event)"
-          onclick="triggerFileInput()"
-        >
-          <div class="plus-sign">+</div>
-          <p>Drag and drop files here, or click to choose files</p>
-          <input
-            type="file"
-            id="file-input"
-            name="files"
-            accept=".txt,.pdf"
-            onchange="handleFileSelect(event)"
-            style="display: none"
-          />
+    <div id="maincontent" class="content">
+      <i id="menu-btn" class="bi bi-list fs-3 text-light"></i>
+      <i class="fa-regular fa-bookmark" title="Save results"></i>
+      <i class="fa-solid fa-floppy-disk" title="Retrieve saved results"></i>
+      <i class="fa-solid fa-share-from-square" title="Share results"></i>
+      <br />
+      <!-- File Upload Section -->
+      <form method="POST" enctype="multipart/form-data">
+        <div id="file-upload-container">
+          <div
+            id="file-drop-area"
+            ondrop="handleFileDrop(event)"
+            ondragover="allowDrop(event)"
+            onclick="triggerFileInput()"
+          >
+            <div class="plus-sign">+</div>
+            <p>Drag and drop files here, or click to choose files</p>
+            <input
+              type="file"
+              id="file-input"
+              name="files"
+              accept=".txt,.pdf"
+              onchange="handleFileSelect(event)"
+              style="display: none"
+            />
+          </div>
+          <button id="upload-button" onclick="uploadFiles()">Upload</button>
         </div>
-        <button id="upload-button" onclick="uploadFiles()">Upload</button>
-      </div>
-    </form>
+      </form>
 
-    <!-- Cards Layout -->
-    <div class="card-container">
-      <!-- Display Selected Files -->
-      <div id="selected-files" class="card">
-        <h2>SELECTED FILES</h2>
-        <ul id="file-list"></ul>
-      </div>
+      <!-- Cards Layout -->
+      <div class="card-container container-fluid">
+        <!-- Display Selected Files -->
+        <div id="selected-files" class="card">
+          <h2>SELECTED FILES</h2>
+          <ul id="file-list"></ul>
+        </div>
 
-      <!-- Sources Section -->
-      <div id="sources" class="card">
-        <h2>SOURCES</h2>
-        <form method="POST">
-          <ul>
-            {% for file in uploaded_files %}
-            <li>
-              <input
-                type="checkbox"
-                name="selected_files"
-                value="{{ file.name }}"
-                id="file-{{ loop.index }}"
-              />
-              <label for="file-{{ loop.index }}">{{ file.name }}</label>
-              <pre>{{ file.content[:200] }}...</pre>
-              <!-- Display first 200 characters -->
-            </li>
-            {% endfor %}
-          </ul>
-          <!-- Search Section -->
+        <!-- Sources Section -->
+        <div id="sources" class="card">
+          <h2>SOURCES</h2>
+          <form method="POST">
+            <ul>
+              {% for file in uploaded_files %}
+              <li>
+                <input
+                  type="checkbox"
+                  name="selected_files"
+                  value="{{ file.name }}"
+                  id="file-{{ loop.index }}"
+                />
+                <label for="file-{{ loop.index }}">{{ file.name }}</label>
+                <pre>{{ file.content[:200] }}...</pre>
+                <!-- Display first 200 characters -->
+              </li>
+              {% endfor %}
+            </ul>
+            <!-- Search Section -->
 
-          <input
-            id="search"
-            type="text"
-            name="query"
-            placeholder="Enter your search query"
-          />
-          <button id="searchbutton" type="submit">Search</button>
-        </form>
+            <input
+              id="search"
+              type="text"
+              name="query"
+              placeholder="Enter your search query"
+            />
+            <button id="searchbutton" type="submit">Search</button>
+          </form>
+        </div>
       </div>
+      <!-- Results Section (when results are available) -->
+      {% if results %}
+      <div class="card" id="results">
+        <h2>RESULTS FOR "{{ query }}"</h2>
+        <ul>
+          {% for result in results %}
+          <li>
+            <h3>
+              Document {{ result.doc_index }} (Score: {{
+              "%.4f"|format(result.score) }})
+            </h3>
+            <h4>Matching Sections:</h4>
+            <ul>
+              {% for section in result.matching_sections %}
+              <li>{{ section | safe }}</li>
+              <!-- Use `safe` to render HTML -->
+              {% endfor %}
+            </ul>
+            <h4>Paraphrased Response:</h4>
+            <p>{{ result.paraphrased_response }}</p>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <!-- Display Errors -->
+      {% if error %}
+      <p style="color: red">{{ error }}</p>
+      {% endif %}
     </div>
-    <!-- Results Section (when results are available) -->
-    {% if results %}
-    <div class="card" id="results">
-      <h2>RESULTS FOR "{{ query }}"</h2>
-      <ul>
-        {% for result in results %}
-        <li>
-          <h3>
-            Document {{ result.doc_index }} (Score: {{
-            "%.4f"|format(result.score) }})
-          </h3>
-          <h4>Matching Sections:</h4>
-          <ul>
-            {% for section in result.matching_sections %}
-            <li>{{ section | safe }}</li>
-            <!-- Use `safe` to render HTML -->
-            {% endfor %}
-          </ul>
-          <h4>Paraphrased Response:</h4>
-          <p>{{ result.paraphrased_response }}</p>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
-
-    <!-- Display Errors -->
-    {% if error %}
-    <p style="color: red">{{ error }}</p>
-    {% endif %}
-
-    <!-- JavaScript for File Upload Handling -->
-    <script>
-      // Handle file selection for display
-      document
-        .getElementById("file-input")
-        .addEventListener("change", function (event) {
-          const fileList = document.getElementById("file-list");
-          fileList.innerHTML = ""; // Clear previous list
-
-          const files = event.target.files;
-          for (const file of files) {
-            const listItem = document.createElement("li");
-            listItem.textContent = file.name;
-            fileList.appendChild(listItem);
-          }
-        });
-
-      // Allow drag-and-drop file upload
-      function allowDrop(event) {
-        event.preventDefault();
-      }
-
-      function handleFileDrop(event) {
-        event.preventDefault();
-        const files = event.dataTransfer.files;
-        const fileInput = document.getElementById("file-input");
-        fileInput.files = files;
-
-        // Display files in the file list
-        const fileList = document.getElementById("file-list");
-        fileList.innerHTML = ""; // Clear previous list
-        for (const file of files) {
-          const listItem = document.createElement("li");
-          listItem.textContent = file.name;
-          fileList.appendChild(listItem);
-        }
-      }
-
-      // Handle file selection
-      function handleFileSelect(event) {
-        const files = event.target.files;
-        const fileList = document.getElementById("file-list");
-        fileList.innerHTML = ""; // Clear previous list
-
-        for (const file of files) {
-          const listItem = document.createElement("li");
-          listItem.textContent = file.name;
-          fileList.appendChild(listItem);
-        }
-      }
-
-      // Trigger file input click event
-      function triggerFileInput() {
-        document.getElementById("file-input").click();
-      }
-
-      // Simulate upload action (for demonstration)
-      function uploadFiles() {
-        alert("Files uploaded successfully!");
-      }
-
-      document.addEventListener("DOMContentLoaded", function () {
-        const bookmarkIcon = document.querySelector(".fa-bookmark");
-        const floppyDiskIcon = document.querySelector(".fa-floppy-disk");
-        const shareIcon = document.querySelector(".fa-share-from-square");
-
-        // Function to save results
-        function saveResults() {
-          const resultsContainer = document.getElementById("results");
-          const searchQuery = document.getElementById("search").value;
-
-          if (resultsContainer) {
-            localStorage.setItem("savedResults", resultsContainer.innerHTML);
-            localStorage.setItem("savedQuery", searchQuery);
-            alert("Results saved!");
-          } else {
-            alert("No results to save!");
-          }
-        }
-
-        // Function to restore saved results
-        function restoreResults() {
-          const savedResults = localStorage.getItem("savedResults");
-          const savedQuery = localStorage.getItem("savedQuery");
-
-          if (savedResults) {
-            let resultsSection = document.getElementById("results");
-            if (!resultsSection) {
-              resultsSection = document.createElement("div");
-              resultsSection.classList.add("card");
-              resultsSection.id = "results";
-              document.body.appendChild(resultsSection);
-            }
-            resultsSection.innerHTML = onsavedResults;
-            alert("Results restored!");
-          } else {
-            alert("No saved results found.");
-          }
-        }
-
-        // Function to share results
-        function shareResults() {
-          const savedResults = localStorage.getItem("savedResults");
-          const savedQuery = localStorage.getItem("savedQuery");
-
-          if (savedResults) {
-            const textToShare =
-              `Search Results for "${savedQuery}":\n\n` +
-              savedResults.replace(/<\/?[^>]+(>|$)/g, ""); // Removing HTML tags for text format
-            if (navigator.share) {
-              navigator
-                .share({
-                  title: "BM25 Search Results",
-                  text: textToShare,
-                  url: window.location.href,
-                })
-                .then(() => console.log("Shared successfully"))
-                .catch((err) => console.error("Error sharing:", err));
-            } else {
-              alert(
-                "Sharing is not supported in this browser. Copy and share manually."
-              );
-            }
-          } else {
-            alert("No results to share!");
-          }
-        }
-
-        // Attach event listeners
-        bookmarkIcon.addEventListener("click", saveResults);
-        floppyDiskIcon.addEventListener("click", restoreResults);
-        shareIcon.addEventListener("click", shareResults);
-      });
-    </script>
   </body>
+  <script src="{{url_for('static',filename='script.js')}}" defer></script>
 </html>

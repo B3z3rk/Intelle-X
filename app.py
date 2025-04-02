@@ -1,9 +1,20 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for,flash, session
+from flask_mail import Mail, Message
+from dotenv import load_dotenv
 import os
 from functools import lru_cache
 from bm25_search_engine.bm25.bm25 import BM25
 from bm25_search_engine.bm25.preprocess import preprocess_text
 from bm25_search_engine.bm25.file_handlers import read_text_file, extract_text_from_pdf
+from form import LoginForm, SignupForm
+import mysql.connector
+from functools import lru_cache
+from mysql.connector import Error
+from itsdangerous import URLSafeTimedSerializer
+from werkzeug.security import check_password_hash, generate_password_hash
+from flask_login import  LoginManager, login_user, logout_user, current_user, login_required
+from model import User
+from flask_login import LoginManager
 from transformers import BartForConditionalGeneration, BartTokenizer, pipeline
 from sentence_transformers import CrossEncoder
 from nltk.corpus import stopwords
@@ -11,13 +22,185 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import nltk
 
-# Initialize NLTK
-nltk.download('stopwords')
-nltk.download('punkt')
+# Download NLTK stopwords (run once)
+#nltk.download('stopwords')
+#nltk.download('punkt')
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
+
+# Flask-Mail Configuration
+app.config["MAIL_SERVER"] = "smtp.gmail.com"
+app.config["MAIL_PORT"] = 587 
+app.config["MAIL_USE_TLS"] = True 
+app.config["MAIL_USE_SSL"] = False
+app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")  
+app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+app.config["MAIL_DEFAULT_SENDER"] = os.getenv("MAIL_USERNAME")
+
+
+mail = Mail(app)
+serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+
+# MySQL credentials
+db_user = os.getenv('MYSQL_USER')
+db_pass = os.getenv('MYSQL_PASSWORD')
+db_host = os.getenv('MYSQL_HOST')
+db_name = os.getenv('MYSQL_DB')
+
+# Ensure the uploads folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Setup Login Manager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'  # redirect here if not logged in
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        conn = mysql.connector.connect(
+            user=db_user,
+            password=db_pass,
+            host=db_host,
+            database=db_name
+        )
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM user WHERE userID = %s", (user_id,))
+        user_data = cursor.fetchone()
+        conn.close()
+        if user_data:
+            return User(user_data)
+    except Exception as e:
+        app.logger.error(f"User loader failed: {e}")
+    return None
+
+
+@app.route('/', methods=['GET', 'POST'])
+def login_view():
+    #session.pop('_flashes', None)
+    form = LoginForm()
+    if request.method == "POST" and form.validate_on_submit():
+        email = form.email.data
+        password = str(form.password.data)
+        try:
+            with mysql.connector.connect(
+                user=db_user, 
+                password=db_pass,
+                host=db_host,
+                database=db_name
+            ) as conn:
+                with conn.cursor(dictionary=True) as cursor:
+                    cursor.execute("SELECT * FROM user WHERE email = %s", (email,))
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        user = User(result)
+                        
+                        # Check if email is verified before allowing login
+                        if not user.verified:
+                            flash("Account not verified. Please check your email.", "danger")
+                            return redirect(url_for("login_view"))
+                        
+                        if check_password_hash(user.password, password): 
+                            login_user(user)
+                            #flash("Login Successful.", 'success')
+                            return redirect(url_for("index"))
+                        else:
+                            flash("Invalid password.", "danger")
+                    else:
+                        flash("User not found.", "danger")
+        except mysql.connector.Error as e:
+            flash("Database connection failed.", "danger")
+            app.logger.error(f"MySQL Error: {e}")
+
+    return render_template('login.html', form=form)
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash("You have been logged out.", "success")
+    return redirect(url_for('login_view'))
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    form = SignupForm()
+    if request.method == "POST" and form.validate_on_submit():
+        firstName = form.firstname.data
+        lastName = form.lastname.data
+        email = form.email.data
+        password = form.password.data
+        hashed_password = generate_password_hash(password, method="pbkdf2:sha256", salt_length=16)
+
+        try:
+            with mysql.connector.connect(
+                user=db_user,
+                password=db_pass,
+                host=db_host,
+                database=db_name
+            ) as conn:
+                with conn.cursor(dictionary=True) as cursor:
+                    # Check if user already exists
+                    cursor.execute("SELECT * FROM user WHERE email = %s", (email,))
+                    if cursor.fetchone():
+                        flash("Email already registered.", "danger")
+                    else:
+                        # Generate verification token
+                        token = serializer.dumps(email, salt="email-confirm")
+
+                        # Send verification email
+                        verify_url = url_for("verify_email", token=token, _external=True)
+                        subject = "Confirm Your Email"
+                        body = f"Click the link to verify your email: {verify_url}"
+
+                        msg = Message(subject, recipients=[email], body=body)
+                        mail.send(msg)
+
+                        # Insert unverified user into the database
+                        cursor.execute(
+                            "INSERT INTO user (firstName, lastName, email, verified,  password) VALUES (%s, %s, %s, %s, %s)",
+                            (firstName, lastName, email, 0, hashed_password)
+                        )
+                        conn.commit()
+
+                        flash("Signup successful. Please check your email to verify your account.", "success")
+                        return redirect(url_for("login_view"))
+        except mysql.connector.Error as e:
+            flash("Database error during signup.", "danger")
+            app.logger.error(f"MySQL Error: {e}")
+
+    return render_template("signup.html", form=form)
+
+
+@app.route("/verify-email/<token>")
+def verify_email(token):
+    try:
+        email = serializer.loads(token, salt="email-confirm", max_age=3600)  # Token expires in 1 hour
+
+        with mysql.connector.connect(
+            user=db_user,
+            password=db_pass,
+            host=db_host,
+            database=db_name
+        ) as conn:
+            with conn.cursor(dictionary=True) as cursor:
+                cursor.execute("UPDATE user SET verified = %s WHERE email = %s", (1, email))
+                conn.commit()
+
+        flash("Email verified successfully! You can now log in.", "success")
+    except Exception:
+        flash("Invalid or expired token.", "danger")
+
+    return redirect(url_for("login_view"))
+
 
 # --- Global Variables ---
 search_engine = None
@@ -63,7 +246,7 @@ def cached_search(query, corpus_indices):
     return engine.rank_documents(expand_query(preprocess_text(query)))
 
 # --- Core Functions ---
-def chunk_text(text, chunk_size=500):
+def chunk_text(text, chunk_size=2000):
     words = text.split()
     return [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
 
@@ -91,7 +274,8 @@ def interpret_answer(query, bm25_results):
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 # --- Routes ---
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/home', methods=['GET', 'POST'])
+@login_required
 def index():
     global search_engine, documents_content, uploaded_files
 

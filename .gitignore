@@ -1,0 +1,25 @@
+# Ignore virtual environment
+venv/
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Ignore environment variable file
+.env
+
+# Ignore training/output directories
+logs/
+results/
+fine-tuned-distilbart/
+
+#Ingore uploads
+uploads/
+
+# Ignore system/IDE files
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
