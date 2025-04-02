@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login</title>
     <link
@@ -14,45 +15,70 @@
       href="https://fonts.googleapis.com/css2?family=Madimi+One&family=Sevillana&display=swap"
       rel="stylesheet"
     />
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
   </head>
 
   <body class="welcomepage">
-    {% with messages = get_flashed_messages(with_categories=true) %} {% if
-    messages %}
-    <ul class="flashes">
-      {% for category, message in messages %}
-      <li class="flash {{ category }}">{{ message }}</li>
-      {% endfor %}
-    </ul>
-    {% endif %} {% endwith %}
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <img id="logo" src="{{ url_for('static', filename='logo.png') }}" /><br />
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-toggle="collapse"
+        data-target="#navbarNavAltMarkup"
+        aria-controls="navbarNavAltMarkup"
+        aria-expanded="true"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+        <div class="navbar-nav">
+          <a class="nav-item nav-link active" href="#">About</a>
+        </div>
+      </div>
+    </nav>
+    <div id="login-container">
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %}
+      <ul class="flashes">
+        {% for category, message in messages %}
+        <li class="flash {{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %} {% endwith %}
 
-    <p id="about">About Us</p>
-    <h1>WELCOME TO</h1>
-    <img id="logo" src="{{ url_for('static', filename='logo.png') }}" /><br />
+      <h1>GET STARTED</h1>
 
-    <form id="welcome" method="POST" action="{{ url_for('login_view') }}">
-      {{ form.hidden_tag() }} {{ form.email.label }}
+      <form id="welcome" method="POST" action="{{ url_for('login_view') }}">
+        {{ form.hidden_tag() }} {{ form.email.label }}
 
-      <br />
+        <br />
 
-      {{ form.email(size=32, placeholder='Enter Email') }}
+        {{ form.email(size=32, placeholder='Enter Email') }}
 
-      <br />
+        <br />
 
-      {% for error in form.email.errors %}
-      <span style="color: red">{{ error }}</span><br />
-      {% endfor %} {{ form.password.label }}
+        {% for error in form.email.errors %}
+        <span style="color: red">{{ error }}</span><br />
+        {% endfor %} {{ form.password.label }}
 
-      <br />
+        <br />
 
-      {{ form.password(size=32, placeholder='Enter Password') }}
+        {{ form.password(size=32, placeholder='Enter Password') }}
 
-      <br />
+        <br />
 
-      {% for error in form.password.errors %}
-      <span style="color: red">{{ error }}</span><br />
-      {% endfor %} {{form.submit()}}
-    </form>
-    <a id="signup" href="{{ url_for('signup') }}">Signup</a>
+        {% for error in form.password.errors %}
+        <span style="color: red">{{ error }}</span><br />
+        {% endfor %} {{form.submit() }}
+      </form>
+      <a id="signup" href="{{ url_for('signup') }}">Signup</a>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
