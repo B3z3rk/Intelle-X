@@ -8,6 +8,7 @@ CREATE TABLE user(
     firstName VARCHAR(100) NOT NULL,
     lastName VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
+    verified TINYINT(1) DEFAULT 0,
     password VARCHAR(200) NOT NULL
 );
 

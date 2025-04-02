@@ -6,5 +6,6 @@ class User(UserMixin):
         self.firstName = user_dict['firstName']
         self.lastName = user_dict['lastName']
         self.email = user_dict['email']
+        self.verified = user_dict['verified']
         self.password = user_dict['password']
 
