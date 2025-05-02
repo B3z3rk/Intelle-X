@@ -11,5 +11,3 @@ CREATE TABLE user(
     verified TINYINT(1) DEFAULT 0,
     password VARCHAR(200) NOT NULL
 );
-
-

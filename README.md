@@ -48,7 +48,7 @@ Installation
 
 1. Clone the Repository
 git clone https://github.com/your-username/bm25-search-engine.git
-cd bm25-search-engine
+cd bm25_search_engine
 
 2. Create a Virtual Environment
 python -m venv .venv
@@ -65,11 +65,11 @@ pip install -r requirements.txt
 
 4. Install NLTK Data
 Run the following Python commands to download NLTK data:
-
+python
 import nltk
 nltk.download('punkt')
 nltk.download('stopwords')
-
+nltk.download('punkt_tab')
 
 Running the Project in VS Code
 1. Open the Project in VS Code
@@ -84,6 +84,7 @@ Choose the virtual environment you created (e.g., .venv).
 Open the integrated terminal in VS Code (`Ctrl+``).
 Run the Flask app:
 python app.py
+flask --app app --debug run 
 Open your browser and navigate to http://127.0.0.1:5000/.
 
 
