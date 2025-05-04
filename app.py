@@ -1,30 +1,32 @@
 from flask import Flask, render_template, request, redirect, url_for,flash, session
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
-import os
 from functools import lru_cache
 from bm25_search_engine.bm25.bm25 import BM25
 from bm25_search_engine.bm25.preprocess import preprocess_text
 from bm25_search_engine.bm25.file_handlers import read_text_file, extract_text_from_pdf
 from form import LoginForm, SignupForm
 import mysql.connector
-from functools import lru_cache
 from mysql.connector import Error
 from itsdangerous import URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_login import  LoginManager, login_user, logout_user, current_user, login_required
 from model import User
-from flask_login import LoginManager
-from transformers import BartForConditionalGeneration, BartTokenizer, pipeline
+import traceback
+import os
+from openai import OpenAI
+from transformers import pipeline
 from sentence_transformers import CrossEncoder
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import nltk
+from nltk import sent_tokenize
+
 
 # Download NLTK stopwords (run once)
-#nltk.download('stopwords')
-#nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('punkt')
 
 # Load environment variables
 load_dotenv()
@@ -51,6 +53,14 @@ db_user = os.getenv('MYSQL_USER')
 db_pass = os.getenv('MYSQL_PASSWORD')
 db_host = os.getenv('MYSQL_HOST')
 db_name = os.getenv('MYSQL_DB')
+
+# Set up OpenAI API Key
+#api_key=os.environ.get("OPENAI_API_KEY")
+#openai.api_key = os.getenv("OPENAI_API_KEY")
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+if not client:
+    raise ValueError("Missing OpenAI API Key in environment variables.")
 
 # Ensure the uploads folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -210,10 +220,9 @@ stop_words = set(stopwords.words('english'))
 stemmer = PorterStemmer()
 
 # --- Model Initialization ---
-model = BartForConditionalGeneration.from_pretrained("sshleifer/distilbart-cnn-12-6")
-tokenizer = BartTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
 intent_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+
 
 # --- BM25 Improvements ---
 SYNONYM_MAP = {
@@ -264,14 +273,34 @@ def highlight_matches(text, query):
             matching_sections.append(sentence)
     return matching_sections
 
-def interpret_answer(query, bm25_results):
-    context = " ".join(bm25_results)
-    inputs = tokenizer.encode(f"question: {query} context: {context}", 
-                            return_tensors="pt", 
-                            max_length=512, 
-                            truncation=True)
-    outputs = model.generate(inputs, max_length=200)
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+def interpret_answer(query, matching_sections):
+    if not matching_sections:
+        return "Sorry, I couldn't find any relevant information to answer your question."
+
+    context = " ".join(matching_sections[:3])  # Use top 3 relevant sections
+
+    system_prompt = (
+        "You are a document-based assistant. Answer the user's question only using the provided context from the documents and the user's question. "
+        "provide a clear, natural, and paraphrased answer in complete sentences. Be concise and informative."
+        "Do not use prior knowledge. If the answer is not in the context, say: 'I could not find relevant information in the documents.'"
+    )
+
+    user_prompt = f"Context:\n{context}\n\nQuestion:\n{query}\n\nAnswer:"
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=400
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        traceback.print_exc()
+        return "An error occurred while generating the response."
 
 # --- Routes ---
 @app.route('/home', methods=['GET', 'POST'])
@@ -281,26 +310,25 @@ def index():
 
     if request.method == 'POST':
         if 'files' in request.files:
-            # File upload handling (unchanged)
             files = request.files.getlist('files')
             corpus = []
             documents_content = []
             uploaded_files = []
+
             for file in files:
                 if file.filename == '':
                     continue
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
                 file.save(file_path)
                 text = read_text_file(file_path) if file.filename.endswith('.txt') else extract_text_from_pdf(file_path)
-                chunks = chunk_text(text) if len(text.split()) > 1000 else [text]
-                for i, chunk in enumerate(chunks):
-                    corpus.append(preprocess_text(chunk))
-                    documents_content.append(chunk)
-                    uploaded_files.append({
-                        'name': f"{file.filename} (chunk {i+1})" if len(chunks) > 1 else file.filename,
-                        'content': chunk
-                    })
-            search_engine = True  # Flag that documents are loaded
+
+                corpus.append(preprocess_text(text))  # Full document
+                documents_content.append(text)        # Full document text
+                uploaded_files.append({
+                    'name': file.filename,
+                    'content': text
+                })
+            search_engine = BM25(corpus)
             return redirect(url_for('index'))
 
         if 'query' in request.form:
@@ -310,42 +338,43 @@ def index():
             if not search_engine:
                 return render_template('index.html', error="No documents uploaded yet.", uploaded_files=uploaded_files)
             
-            corpus_indices = tuple(i for i, f in enumerate(uploaded_files) if f['name'] in selected_files)
+            corpus_indices = [i for i, f in enumerate(uploaded_files) if f['name'] in selected_files]
             if not corpus_indices:
                 return render_template('index.html', error="No documents selected.", uploaded_files=uploaded_files)
-            
-            # Improved search pipeline
-            ranked_docs = cached_search(query, corpus_indices)
-            filtered_corpus = [documents_content[i] for i in corpus_indices]
-            
-            # Rerank top 10 results
-            if ranked_docs:
-                pairs = [(query, filtered_corpus[doc_idx]) for doc_idx, _ in ranked_docs[:10]]
-                reranker_scores = reranker.predict(pairs)
-                combined_results = []
-                for (doc_idx, bm25_score), rerank_score in zip(ranked_docs[:10], reranker_scores):
-                    combined_results.append((doc_idx, 0.7*bm25_score + 0.3*rerank_score))
-                ranked_docs = sorted(combined_results, key=lambda x: x[1], reverse=True)
-            
-            # Prepare results
+
+            query_pre = preprocess_text(query)
+            ranked_docs = []
+            for i in corpus_indices:
+                score = search_engine._compute_bm25_score(query_pre.split(), i)
+                ranked_docs.append((i, score))
+            ranked_docs.sort(key=lambda x: x[1], reverse=True)
+
             results = []
-            bm25_results = []
-            for doc_index, score in ranked_docs[:5]:  # Return top 5 results
-                matching_sections = highlight_matches(filtered_corpus[doc_index], query)
-                bm25_results.extend(matching_sections)
+            for doc_index, score in ranked_docs[:3]:  # Top 3 documents
+                full_text = documents_content[doc_index]
+                sentences = sent_tokenize(full_text)
+
+                # Score each sentence individually using BM25 scoring logic
+                scored_sentences = []
+                for sent in sentences:
+                    sent_score = BM25([preprocess_text(sent)])._compute_bm25_score(query_pre.split(), 0)
+                    scored_sentences.append((sent, sent_score))
+                top_sentences = sorted(scored_sentences, key=lambda x: x[1], reverse=True)[:3]  # Top 3 matching sentences
+
+                # Prepare results
                 results.append({
                     'doc_index': doc_index,
                     'score': score,
-                    'content': filtered_corpus[doc_index],
-                    'matching_sections': matching_sections,
-                    'paraphrased_response': interpret_answer(query, matching_sections)
+                    'matching_sections': [s[0] for s in top_sentences],
+                    'paraphrased_response': interpret_answer(query, [s[0] for s in top_sentences]),
+                    'content': uploaded_files[doc_index]['content']
                 })
-                
-            return render_template('index.html', 
-                                results=results,
-                                query=query,
-                                uploaded_files=uploaded_files,
-                                final_answer=interpret_answer(query, bm25_results))
+
+            return render_template('index.html',
+                                   results=results,
+                                   query=query,
+                                   uploaded_files=uploaded_files,
+                                   final_answer=interpret_answer(query, [r['content'] for r in results]))
 
     return render_template('index.html', uploaded_files=uploaded_files)
 
