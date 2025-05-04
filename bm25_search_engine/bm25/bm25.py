@@ -1,5 +1,7 @@
 from collections import defaultdict
 import math
+from .preprocess import preprocess_text, expand_query
+
 
 class BM25:
     def __init__(self, corpus, k1=1.5, b=0.75):
