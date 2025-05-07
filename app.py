@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for,flash, session
+from flask import Flask, render_template, request, redirect, url_for,flash, session,send_from_directory
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
 from functools import lru_cache
@@ -27,6 +27,7 @@ from nltk import sent_tokenize
 # Download NLTK stopwords (run once)
 nltk.download('stopwords')
 nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger_eng')
 
 # Load environment variables
 load_dotenv()
@@ -220,8 +221,8 @@ stop_words = set(stopwords.words('english'))
 stemmer = PorterStemmer()
 
 # --- Model Initialization ---
-intent_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+# intent_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+# reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
 
 
 # --- BM25 Improvements ---
@@ -367,16 +368,111 @@ def index():
                     'score': score,
                     'matching_sections': [s[0] for s in top_sentences],
                     'paraphrased_response': interpret_answer(query, [s[0] for s in top_sentences]),
-                    'content': uploaded_files[doc_index]['content']
+                    'content': uploaded_files[doc_index]['content'],
+                    'filename': uploaded_files[doc_index]['name']
                 })
+        db=mysql.connector.connect(
+            user=db_user,
+            password=db_pass,
+            host=db_host,
+            database=db_name)
+        cursor = db.cursor()
 
+        user_id = current_user.id
+
+        # Insert each result 
+        for result in results:
+            cursor.execute("""
+                INSERT INTO history (userID, query, docIndex, filename, score, matching_sections, paraphrased_response)
+                VALUES (%s, %s, %s, %s, %s, %s,%s)
+            """, (
+                user_id,
+                query,
+                result['doc_index'],
+                result['filename'],
+                result['score'],
+                "; ".join(result['matching_sections']),
+                result['paraphrased_response']
+            ))
+
+            # Delete oldest if user has more than 10
+            cursor.execute("""
+                DELETE FROM history
+                WHERE userID = %s AND hid NOT IN (
+                    SELECT hid FROM (
+                        SELECT hid FROM history
+                        WHERE userID = %s
+                        ORDER BY hid DESC
+                        LIMIT 10
+                    ) AS recent
+                )
+            """, (user_id, user_id))
+
+            db.commit()
+            cursor.close()
+            db.close()
+            history=getHistory()
             return render_template('index.html',
                                    results=results,
                                    query=query,
-                                   uploaded_files=uploaded_files,
+                                   uploaded_files=uploaded_files,history=history,
                                    final_answer=interpret_answer(query, [r['content'] for r in results]))
+    
+    history=getHistory()       
+    return render_template('index.html', uploaded_files=uploaded_files,history=history)
 
-    return render_template('index.html', uploaded_files=uploaded_files)
+@app.route('/view/<filename>')
+def view_file(filename):
+    return render_template('viewer.html', filename=filename)
+
+# return file
+@app.route('/uploads/<filename>')
+def serve_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+#return history
+@app.route('/history/')
+@login_required
+def getHistory():
+    db=mysql.connector.connect(
+            user=db_user,
+            password=db_pass,
+            host=db_host,
+            database=db_name)
+    cursor = db.cursor()
+
+    
+    cursor = db.cursor(dictionary=True) 
+
+    user_id = current_user.id
+    cursor.execute("SELECT * FROM history WHERE userID = %s ORDER BY hid DESC", (user_id,))  
+
+    history = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    return history
+#return history item
+@app.route('/history/<int:hid>')
+@login_required
+def viewHistory(hid):
+    db = mysql.connector.connect(
+        user=db_user,
+        password=db_pass,
+        host=db_host,
+        database=db_name
+    )
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM history WHERE hid = %s AND userID = %s", (hid, current_user.id))
+    item = cursor.fetchone()
+    cursor.close()
+    db.close()
+    history=getHistory()
+    if not item:
+        return "History item not found or unauthorized.", 404
+
+    return render_template('index.html', item=item,history=history)
 
 if __name__ == '__main__':
     app.run(debug=True)
