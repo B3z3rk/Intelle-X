@@ -1,5 +1,29 @@
 // <!-- JavaScript for application -->
 
+const themeIcon = document.getElementById("theme");
+
+// Apply saved theme on load
+window.onload = function () {
+  const theme = localStorage.getItem("theme");
+  if (theme === "dark") {
+    document.body.classList.add("dark-mode");
+    themeIcon.classList.replace("fa-lightbulb", "fa-moon");
+  }
+};
+
+themeIcon.addEventListener("click", function () {
+  document.body.classList.toggle("dark-mode");
+  const isDark = document.body.classList.contains("dark-mode");
+  localStorage.setItem("theme", isDark ? "dark" : "light");
+
+  // Toggle icon
+  if (isDark) {
+    themeIcon.classList.replace("fa-lightbulb", "fa-moon");
+  } else {
+    themeIcon.classList.replace("fa-moon", "fa-lightbulb");
+  }
+});
+
 // Handle file selection for display
 document
   .getElementById("file-input")
@@ -54,9 +78,6 @@ function triggerFileInput() {
   document.getElementById("file-input").click();
 }
 
-
-
-
 document.addEventListener("DOMContentLoaded", function () {
   const sidebar = document.getElementById("sidebar");
   const menuBtn = document.getElementById("menu-btn");
@@ -64,34 +85,31 @@ document.addEventListener("DOMContentLoaded", function () {
   const content = document.getElementById("main-content");
   const body = document.body;
 
-
   // Open Sidebar
   menuBtn.addEventListener("click", function () {
     sidebar.classList.add("active");
     content.classList.add("shifted");
-    body.classList.add('sidebar-open');
-    content.style.marginLeft = '250px';
+    body.classList.add("sidebar-open");
+    content.style.marginLeft = "250px";
   });
 
   // Close Sidebar
   closeBtn.addEventListener("click", function () {
     sidebar.classList.remove("active");
     content.classList.remove("shifted");
-    body.classList.remove('sidebar-open');
-
+    body.classList.remove("sidebar-open");
 
     setTimeout(() => {
       content.style.marginLeft = "0";
     }, 500); //
   });
-
 });
 
 //view document
 
 document.addEventListener("DOMContentLoaded", function () {
   const icon = document.getElementById("view-icon");
-  console.log("here")
+
   if (icon) {
     icon.addEventListener("click", () => {
       const filename = icon.dataset.filename;
@@ -99,3 +117,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 });
+
+//dark mode
+const toggleDarkMode = () => {
+  document.body.classList.toggle("dark-mode");
+};

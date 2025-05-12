@@ -38,30 +38,31 @@
     <div id="sidebar" class="sidebar">
       <button id="close-btn" class="btn btn-danger">&times;</button>
       <h2 class="text-white">Menu</h2>
-      <ul class="list-unstyled">
-        <li>
-          <a href="{{ url_for('index') }}" class="text-white">Home</a
-          ></i>
-        </li>
-        <li>
-          <a href="{{ url_for('logout') }}" >Logout</a
-          ></i>
-        </li>
-        <h5 class="text-white">Search history</h5>
-        <hr class="text-white"/>
-        {% for item in history %}
-        <li>
-          <a
-            href="{{ url_for('viewHistory', hid=item['hid']) }}"
-            class="text-white"
-          >
-            #{{ item['hid'] }} - {{ item['query'] }}
-          </a>
-        </li>
-        {% else %}
-        <li><em class="text-muted">No history found.</em></li>
-        {% endfor %}
-      </ul>
+
+      <div class="sidebar-content">
+        <ul class="list-unstyled">
+          <li>
+            <a href="{{ url_for('index') }}" class="text-white">Home</a>
+          </li>
+          <li>
+            <a href="{{ url_for('logout') }}" class="text-white">Logout</a>
+          </li>
+          <h5 class="text-white">Search history</h5>
+          <hr class="text-white" />
+          {% for item in history %}
+          <li>
+            <a
+              href="{{ url_for('viewHistory', hid=item['hid']) }}"
+              class="text-white"
+            >
+              #{{ item['hid'] }} - {{ item['query'] }}
+            </a>
+          </li>
+          {% else %}
+          <li><em class="text-muted">No history found.</em></li>
+          {% endfor %}
+        </ul>
+      </div>
     </div>
 
     <header class="header d-flex align-items-center">
@@ -69,6 +70,7 @@
     </header>
 
     <div id="maincontent" class="content">
+      <i id="theme" class="fa-solid fa-lightbulb"></i>
       <i id="menu-btn" class="bi bi-list fs-3 text-light"></i>
 
       <br />
@@ -88,6 +90,7 @@
               id="file-input"
               name="files"
               accept=".txt,.pdf"
+              multiple
               onchange="handleFileSelect(event)"
               style="display: none"
             />
@@ -100,7 +103,7 @@
       <div class="card-container container-fluid">
         <!-- Display Selected Files -->
         <div id="selected-files" class="card">
-          <h2>SELECTED FILES</h2>
+          <h2>UPLOAD FILES</h2>
           <ul id="file-list"></ul>
         </div>
 
@@ -118,7 +121,7 @@
                   id="file-{{ loop.index }}"
                 />
                 <label for="file-{{ loop.index }}">{{ file.name }}</label>
-                <pre>{{ file.content[:200] }}...</pre>
+                <pre>{{ file.content[:10] }}...</pre>
                 <!-- Display first 200 characters -->
               </li>
               {% endfor %}
@@ -171,7 +174,15 @@
       <!-- Display history result -->
       {% if item %}
       <div class="card" id="results">
-        <h2>HISTORY RESULT #{{ item.hid }}</h2>
+        <h2>
+          HISTORY RESULT #{{ item.hid }}
+          <i
+            class="fa-solid fa-eye"
+            id="view-icon"
+            data-filename="{{ item.filename }}"
+            title="View Document"
+          ></i>
+        </h2>
         <p><strong>Query:</strong> {{ item.query }}</p>
         <p><strong>Filename:</strong> {{ item.filename }}</p>
         <p><strong>Score:</strong> {{ item.score }}</p>

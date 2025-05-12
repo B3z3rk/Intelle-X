@@ -16,8 +16,8 @@ body {
     font-family: "Madimi One", serif;
     font-weight: 400;
     font-style: normal;
-}
-
+  }
+  
 
 /* Login and Signup page */
 nav {
@@ -25,41 +25,39 @@ nav {
     background-color: #fff;
     color: black;
     border: solid 5px #008080;
+  }
+nav img{
+    width:400px;
+    height:120px;
+
+
 }
-
-nav img {
-    width: 400px;
-    height: 120px;
-
-
-}
-
 .navbar-nav {
     margin-left: 520px;
-}
+  }
 
 a {
     font-weight: 400;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     /* margin-top: 10px; */
     font-size: 20px;
+   
+   
+    
+  }
+  
+  
 
-
-
-}
-
-
-
-.welcomepage {
+.welcomepage{
     background-image: url('background2.webp');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
+    background-size: cover; 
+    background-position: center; 
+    background-repeat: no-repeat; 
     position: relative;
     height: 100vh;
     margin: 0;
     font-family: 'Arial', sans-serif;
-
+  
 }
 
 /* .welcomepage::before {
@@ -74,45 +72,41 @@ a {
     z-index: -1; 
 } */
 
-#login-container {
+#login-container{
     display: flex;
     justify-content: center;
     align-items: center;
-    flex-direction: column;
+    flex-direction: column; 
 }
 
-.welcomepage h1 {
 
+.welcomepage h1 {
+   
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     text-align: center;
     animation: colorChange 4s infinite alternate;
-    margin-top: 50px;
+    margin-top:50px;
 }
-
 @keyframes colorChange {
     0% {
         color: #85D4FF;
     }
-
     25% {
         color: #15caca;
     }
-
     50% {
         color: #31877B;
     }
-
     75% {
         color: #04678B;
     }
-
     100% {
         color: #416788;
     }
 }
 
-#welcome {
-    position: relative;
+#welcome{
+    position:relative; 
     /* margin-top:50px; */
     background: #fff;
     padding: 20px;
@@ -123,8 +117,8 @@ a {
     text-align: center;
     transform: scale(0.9);
     animation: fadeIn 0.5s ease-out forwards, scaleUp 0.5s ease-out forwards;
-
-
+    
+   
 }
 
 #welcome input {
@@ -149,25 +143,22 @@ a {
     transition: all 0.3s ease;
 }
 
-#welcome button:hover {
+#welcome .submit-btn:hover {
     background-color: #15caca;
     transform: scale(1.05);
 }
 
-#signup,
-#login {
+#signup,#login {
     margin-top: 5px;
     cursor: pointer;
-    color: #fff;
+    color:#fff ;
     font-size: 20px;
-    display: block;
+    display: block; 
     text-align: center;
 }
-
-#already {
-    color: #46f3f3;
+#already{
+    color:#46f3f3;
 }
-
 #signup:hover {
     text-decoration: underline;
 }
@@ -184,49 +175,48 @@ a {
 /* Header */
 header {
     /* background: linear-gradient(to right,  #008080, #04f6f6); */
-    background: #fff;
+    background:#fff;
     padding: 50px 40px;
     text-align: center;
     position: relative;
     clip-path: polygon(100% 0, 100% 50%, 50% 100%, 0 50%, 0 0);
     color: white;
     border: solid 20px #008080;
-
+    
 }
 
 
 
 header img {
     position: absolute;
-    top: 50%;
+    top: 50%; 
     left: 50%;
-    transform: translate(-50%, -50%);
-    height: 150%;
-    width: auto;
+    transform: translate(-50%, -50%); 
+    height: 150%; 
+    width: auto; 
+   
+} 
 
-}
-
-i {
-    font-size: 30px;
-    float: right;
+i{
+    font-size:30px;
+    float:right;
     margin-right: 40px;
     margin-bottom: 80px;
     color: #008080;
 }
-
 /* File Upload and Search */
 #file-upload-container {
     margin: 20px auto;
     max-width: 600px;
     text-align: center;
-    background-image: url('index2.jpg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
+    background-image:url('index2.jpg') ;
+    background-size: cover; 
+    background-position: center; 
+    background-repeat: no-repeat; 
     /* background:white; */
     padding: 20px;
     border-radius: 10px;
-    border: 2px solid #008080;
+    border:2px solid  #008080; 
     margin-top: 50px;
 }
 
@@ -246,7 +236,7 @@ i {
 
 #file-drop-area .plus-sign {
     font-size: 40px;
-    color: #008080;
+    color:#008080;
 }
 
 #upload-button {
@@ -265,22 +255,22 @@ i {
 
 #searchbutton {
     padding: 12px 20px;
-    background-color: #008080;
+    background-color:  #008080;
     border: none;
     color: white;
     border-radius: 8px;
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.2s ease;
-
+    
 }
 
 /* search */
 #searchbutton:hover {
-    background-color: #49d1d1;
+    background-color:#49d1d1;
     transform: scale(1.1);
 }
 
-#search {
+#search{
     width: 75%;
     padding: 10px;
     margin: 5px 0;
@@ -288,7 +278,6 @@ i {
     border-radius: 8px;
     font-size: 14px;
 }
-
 /* Cards Section */
 .card-container {
     display: flex;
@@ -298,35 +287,35 @@ i {
     padding: 30px;
     border-radius: 15px;
     gap: 20px;
-
+    
 }
 
-.card-container h2 {
+.card-container h2{
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     align-self: center;
 }
 
 .card {
     /* background: #e6faf7; */
-    background: #ffff;
+    background:#ffff;
     width: 300px;
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease-in-out;
-    border: #008080 solid 2px;
-
-
+    border:#008080 solid 2px;
+    
+    
 }
 
 .card:hover {
-    transform: scale(1.05);
+    transform: scale(1.01);
 }
 
 #sources {
     width: 100%;
     padding: 20px;
-    border: #15caca solid 2px;
+    
 }
 
 #sources li {
@@ -335,18 +324,16 @@ i {
     padding: 10px;
     margin-bottom: 10px;
     border-radius: 5px;
-    font-family: "Madimi One", serif;
+    font-family:"Madimi One", serif;
 }
 
 #sources li pre {
     white-space: pre-wrap;
-    word-wrap: break-word;
-    /* Forces the words to wrap inside the card */
+    word-wrap: break-word;  /* Forces the words to wrap inside the card */
 }
 
 #selected-files {
     margin-bottom: 20px;
-    border: #15caca solid 2px;
 }
 
 ul {
@@ -371,41 +358,47 @@ input[type="file"] {
     border: 1px solid #00bcd4;
 }
 
-#results {
-
-    width: fit-content;
+#results{
+    
+    width:fit-content;
     margin-right: 40px;
     margin-left: 40px;
     margin-bottom: 40px;
-    border: #008080 solid 5px;
 }
 
-#results h4 {
-    color: #008080;
-}
-
-/* Sidebar */
+/* Sidebar Container */
 .sidebar {
     position: fixed;
     top: 0;
     left: -250px;
     width: 250px;
     height: 100vh;
-    background-color: #15caca;
-    padding: 25px;
+    background-color: #3bb8b8; /* Choose your preferred color */
+    padding: 1rem;
     transition: left 0.3s ease-in-out;
+    overflow: hidden; /* Keep header fixed, make inner scrollable */
+    z-index: 1000;
 }
 
+/* Scrollable content within sidebar */
+.sidebar-content {
+    max-height: calc(100vh - 100px); /* Adjust based on header + button */
+    overflow-y: auto;
+    margin-top: 1rem;
+    padding-right: 0.5rem;
+}
+
+/* Body freeze when sidebar is open */
 body.sidebar-open {
     overflow: hidden;
 }
 
-/* Active Sidebar */
+/* Sidebar becomes visible */
 .sidebar.active {
     left: 0;
 }
 
-/* Sidebar close button */
+/* Close button style */
 #close-btn {
     position: absolute;
     top: 10px;
@@ -413,17 +406,20 @@ body.sidebar-open {
     font-size: 20px;
     cursor: pointer;
     background: #008080;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
 }
 
 /* Sidebar Links */
 .sidebar ul {
     padding: 0;
     margin-top: 20px;
+    list-style: none;
 }
 
 .sidebar ul li {
     padding: 10px 0;
-    
 }
 
 .sidebar ul li a {
@@ -431,32 +427,259 @@ body.sidebar-open {
     text-decoration: none;
 }
 
-/* Move Content When Sidebar Opens */
+/* Push content when sidebar is open */
 .content,
 .header {
     transition: margin-left 0.3s ease-in-out;
 }
 
-.sidebar.active~.content,
-.sidebar.active~.header {
+.sidebar.active ~ .content,
+.sidebar.active ~ .header {
     margin-left: 250px;
 }
 
-/* Delayed Move Back When Closing */
-.sidebar.closing~.content,
-.sidebar.closing~.header {
+/* Delayed return when closing */
+.sidebar.closing ~ .content,
+.sidebar.closing ~ .header {
     transition: margin-left 0.3s ease-in-out 0.3s;
-    /* Delay movement */
     margin-left: 0;
 }
 
 /* Menu Button */
 #menu-btn {
     cursor: pointer;
-    background-color: #15caca;
+    background-color:#15caca;
     color: white;
     padding: 5px;
     border-radius: 5px;
     float: left;
     margin-left: 10px;
 }
+
+/* Tablet */
+@media (max-width: 768px) {
+    nav img {
+        width: 250px;
+        height: auto;
+    }
+
+    .navbar-nav {
+        margin-left: 0;
+        text-align: center;
+    }
+
+    header {
+        padding: 30px 20px;
+        clip-path: none;
+        border-width: 10px;
+    }
+
+    header img {
+        height: auto;
+        width: 70%;
+    }
+
+    .card-container {
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .card {
+        width: 90%;
+    }
+
+    #file-upload-container {
+        width: 90%;
+        margin: 20px auto;
+    }
+
+    i {
+        float: none;
+        display: block;
+        margin: 10px auto;
+        text-align: center;
+    }
+
+    #search {
+        width: 100%;
+    }
+
+    #results {
+        margin: 20px;
+    }
+}
+
+/* Mobile */
+@media (max-width: 576px) {
+    #welcome {
+        width: 90%;
+        padding: 15px;
+    }
+
+    .welcomepage h1 {
+        font-size: 1.5rem;
+    }
+
+    #file-upload-container {
+        padding: 15px;
+    }
+
+    .sidebar {
+        width: 46%;
+        left: -100%;
+    }
+
+    .sidebar.active {
+        left: 0;
+    }
+
+    .sidebar.active ~ .content,
+    .sidebar.active ~ .header {
+        margin-left: 0;
+    }
+
+    #menu-btn {
+        margin-left: 0;
+    }
+
+    #results {
+        margin: 20px;
+    }
+}
+
+
+
+
+/* Global Styles */
+body.dark-mode {
+    background-color: #464646;
+    color: white;
+}
+
+/* Navbar */
+body.dark-mode nav {
+    background-color: #464646;
+    color: white;
+}
+
+body.dark-mode a {
+    color: #e0e0e0;
+}
+
+/* Welcome Page */
+body.welcomepage.dark-mode {
+  background-image: url('darkmode.png');
+}
+
+
+/* Header */
+body.dark-mode header {
+    background-color: #333;
+    color: white;
+    border: solid 20px #008080;
+}
+
+body.dark-mode header img {
+    filter: brightness(0.7);
+}
+
+/* File Upload and Search */
+
+
+body.dark-mode #file-drop-area {
+    background-color: #7c7b7b;
+    border: 2px dashed #008080;
+}
+
+body.dark-mode #upload-button {
+    background-color: #008080;
+    color: white;
+}
+
+body.dark-mode #file-list li {
+    background-color: #88a4a8;
+    border: 1px solid #00bcd4;
+}
+
+body.dark-mode #searchbutton {
+    background-color: rgb(97, 218, 223);
+    color: black;
+}
+
+body.dark-mode .card-container {
+    background: #1d1d1d;
+    color: white;
+}
+
+body.dark-mode .card {
+    background-color: #555;
+    border: 2px solid #008080;
+    color: rgb(0, 0, 0);
+}
+
+body.dark-mode .card h2{
+    color: white;
+}
+
+body.dark-mode #results{
+    color: white;
+}
+
+/* Sidebar */
+body.dark-mode .sidebar {
+    background-color: #121212;
+    color: white;
+}
+
+body.dark-mode .sidebar ul li a {
+    color: white;
+}
+
+/* Sidebar active state */
+body.dark-mode .sidebar.active {
+    background-color: #333;
+}
+
+/* Adjusting specific elements */
+body.dark-mode input[type="text"],
+body.dark-mode input[type="file"],
+body.dark-mode #search {
+    background-color: #333;
+    color: white;
+    border: 1px solid #666;
+}
+
+body.dark-mode #menu-btn {
+    background-color: #333;
+    color: white;
+}
+
+body.dark-mode #close-btn {
+    background-color: #008080;
+    color: white;
+}
+
+body.dark-mode #welcome {
+    background-color: #222;
+    color: white;
+}
+
+body.dark-mode #welcome input {
+    background-color: #222;
+    color: white;
+}
+
+body.dark-mode #welcome .submit-btn {
+    background-color: #3bcccc;
+    color: white;
+}
+
+body.dark-mode #welcome .submit-btn:hover {
+    background-color: #5adfc9;
+    transform: scale(1.07);
+}
+
+
+
+

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from functools import lru_cache
 from bm25_search_engine.bm25.bm25 import BM25
 from bm25_search_engine.bm25.preprocess import preprocess_text
-from bm25_search_engine.bm25.file_handlers import read_text_file, extract_text_from_pdf
+from bm25_search_engine.bm25.file_handlers import read_text_file, extract_text_from_pdf, extract_text_from_url
 from form import LoginForm, SignupForm
 import mysql.connector
 from mysql.connector import Error
@@ -22,6 +22,13 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import nltk
 from nltk import sent_tokenize
+from cachetools import TTLCache
+from hashlib import sha256
+
+from heapq import nlargest
+from collections import defaultdict
+
+
 
 
 # Download NLTK stopwords (run once)
@@ -55,6 +62,31 @@ db_pass = os.getenv('MYSQL_PASSWORD')
 db_host = os.getenv('MYSQL_HOST')
 db_name = os.getenv('MYSQL_DB')
 
+# Cache up to 100 queries, each expires after 50 minutes (3000 seconds)
+#query_cache = TTLCache(maxsize=100, ttl=3000)
+from collections import OrderedDict
+
+class LRUCache:
+    def __init__(self, capacity=1000):
+        self.cache = OrderedDict()
+        self.capacity = capacity
+
+    def get(self, key):
+        if key in self.cache:
+            self.cache.move_to_end(key)  # Recently used
+            return self.cache[key]
+        return None
+
+    def put(self, key, value):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if len(self.cache) > self.capacity:
+            self.cache.popitem(last=False)
+
+query_cache = LRUCache(capacity=500)
+
+
 # Set up OpenAI API Key
 #api_key=os.environ.get("OPENAI_API_KEY")
 #openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -82,7 +114,7 @@ def load_user(user_id):
             database=db_name
         )
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM user WHERE userID = %s", (user_id,))
+        cursor.execute("SELECT * FROM user WHERE userId = %s", (user_id,))
         user_data = cursor.fetchone()
         conn.close()
         if user_data:
@@ -216,7 +248,7 @@ def verify_email(token):
 # --- Global Variables ---
 search_engine = None
 documents_content = []
-uploaded_files = []
+'''uploaded_files = []'''
 stop_words = set(stopwords.words('english'))
 stemmer = PorterStemmer()
 
@@ -303,18 +335,86 @@ def interpret_answer(query, matching_sections):
         traceback.print_exc()
         return "An error occurred while generating the response."
 
+
+
+def generate_query_key(query, corpus_indices):
+    key_string = query + "_" + "_".join(map(str, sorted(corpus_indices)))
+    return sha256(key_string.encode()).hexdigest()
+
+
+
+def get_results(query, selected_filenames, uploaded_files, search_engine):
+    cache_key = generate_query_key(query, selected_filenames)
+    '''if cache_key in query_cache:
+        return query_cache[cache_key]  # Cache hit'''
+    cached = query_cache.get(cache_key)
+    if cached:
+        return cached
+
+
+    # Preprocess query once
+    query_pre = preprocess_text(query)
+    query_terms = query_pre.split()
+    query_tokens = set(query_terms)
+
+    # Get indices of selected documents
+    filename_to_index = {f['filename']: i for i, f in enumerate(uploaded_files)}
+    corpus_indices = [filename_to_index[fname] for fname in selected_filenames if fname in filename_to_index]
+
+    # Score documents using BM25
+    ranked_docs = [
+        (i, search_engine._compute_bm25_score(query_terms, i))
+        for i in corpus_indices
+    ]
+    ranked_docs = sorted(ranked_docs, key=lambda x: x[1], reverse=True)
+
+    # Collect top 3 matching documents
+    results = []
+    for doc_index, score in ranked_docs[:3]:
+        full_text = uploaded_files[doc_index]['content']
+        sentences = sent_tokenize(full_text)
+
+        # Score each sentence by token overlap
+        scored_sentences = [
+            (sent, len(query_tokens & set(preprocess_text(sent).split())))
+            for sent in sentences
+        ]
+        top_sentences = [s for s, _ in nlargest(3, scored_sentences, key=lambda x: x[1])]
+        paraphrased = interpret_answer(query, top_sentences)
+
+        results.append({
+            'doc_index': doc_index,
+            'score': score,
+            'matching_sections': top_sentences,
+            'paraphrased_response': paraphrased,
+            'content': full_text,
+            'filename': uploaded_files[doc_index]['filename']
+        })
+
+    #query_cache[cache_key] = results
+    query_cache.put(cache_key, results)
+    return results
+
+
+
 # --- Routes ---
 @app.route('/home', methods=['GET', 'POST'])
 @login_required
 def index():
-    global search_engine, documents_content, uploaded_files
+    db = mysql.connector.connect(
+        user=db_user,
+        password=db_pass,
+        host=db_host,
+        database=db_name)
+    cursor = db.cursor(dictionary=True)
+    user_id = current_user.id
 
     if request.method == 'POST':
         if 'files' in request.files:
             files = request.files.getlist('files')
-            corpus = []
-            documents_content = []
-            uploaded_files = []
+
+            # Remove old files for this user
+            cursor.execute("DELETE FROM user_files WHERE user_id = %s", (user_id,))
 
             for file in files:
                 if file.filename == '':
@@ -323,107 +423,110 @@ def index():
                 file.save(file_path)
                 text = read_text_file(file_path) if file.filename.endswith('.txt') else extract_text_from_pdf(file_path)
 
-                corpus.append(preprocess_text(text))  # Full document
-                documents_content.append(text)        # Full document text
-                uploaded_files.append({
-                    'name': file.filename,
-                    'content': text
-                })
-            search_engine = BM25(corpus)
+                cursor.execute("""
+                    INSERT INTO user_files (user_id, filename, content)
+                    VALUES (%s, %s, %s)
+                """, (user_id, file.filename, text))
+
+            db.commit()
             return redirect(url_for('index'))
 
-        if 'query' in request.form:
+        elif 'query' in request.form:
             query = request.form['query']
-            selected_files = request.form.getlist('selected_files')
-            
-            if not search_engine:
-                return render_template('index.html', error="No documents uploaded yet.", uploaded_files=uploaded_files)
-            
-            corpus_indices = [i for i, f in enumerate(uploaded_files) if f['name'] in selected_files]
-            if not corpus_indices:
+            selected_filenames = request.form.getlist('selected_files')
+
+            cursor.execute("SELECT filename, content FROM user_files WHERE user_id = %s", (user_id,))
+            files = cursor.fetchall()
+
+            if not files:
+                return render_template('index.html', error="No documents uploaded yet.", uploaded_files=[])
+
+            # Ensure uploaded_files is a list of dictionaries with 'filename' and 'content'
+            uploaded_files = [{'filename': f['filename'], 'content': f['content']} for f in files]
+
+            if not any(f['filename'] in selected_filenames for f in uploaded_files):
                 return render_template('index.html', error="No documents selected.", uploaded_files=uploaded_files)
 
-            query_pre = preprocess_text(query)
-            ranked_docs = []
-            for i in corpus_indices:
-                score = search_engine._compute_bm25_score(query_pre.split(), i)
-                ranked_docs.append((i, score))
-            ranked_docs.sort(key=lambda x: x[1], reverse=True)
+            corpus = [preprocess_text(f['content']) for f in uploaded_files if f['filename'] in selected_filenames]
+            search_engine = BM25(corpus)
+            results = get_results(query, selected_filenames, uploaded_files,search_engine)  # Now correctly formatted
 
-            results = []
-            for doc_index, score in ranked_docs[:3]:  # Top 3 documents
-                full_text = documents_content[doc_index]
-                sentences = sent_tokenize(full_text)
+            for result in results:
+                cursor.execute("""
+                    INSERT INTO history (userId, query, docIndex, filename, score, matching_sections, paraphrased_response)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    user_id,
+                    query,
+                    result['doc_index'],
+                    result['filename'],
+                    result['score'],
+                    "; ".join(result['matching_sections']),
+                    result['paraphrased_response']
+                ))
 
-                # Score each sentence individually using BM25 scoring logic
-                scored_sentences = []
-                for sent in sentences:
-                    sent_score = BM25([preprocess_text(sent)])._compute_bm25_score(query_pre.split(), 0)
-                    scored_sentences.append((sent, sent_score))
-                top_sentences = sorted(scored_sentences, key=lambda x: x[1], reverse=True)[:3]  # Top 3 matching sentences
-
-                # Prepare results
-                results.append({
-                    'doc_index': doc_index,
-                    'score': score,
-                    'matching_sections': [s[0] for s in top_sentences],
-                    'paraphrased_response': interpret_answer(query, [s[0] for s in top_sentences]),
-                    'content': uploaded_files[doc_index]['content'],
-                    'filename': uploaded_files[doc_index]['name']
-                })
-        db=mysql.connector.connect(
-            user=db_user,
-            password=db_pass,
-            host=db_host,
-            database=db_name)
-        cursor = db.cursor()
-
-        user_id = current_user.id
-
-        # Insert each result 
-        for result in results:
-            cursor.execute("""
-                INSERT INTO history (userID, query, docIndex, filename, score, matching_sections, paraphrased_response)
-                VALUES (%s, %s, %s, %s, %s, %s,%s)
-            """, (
-                user_id,
-                query,
-                result['doc_index'],
-                result['filename'],
-                result['score'],
-                "; ".join(result['matching_sections']),
-                result['paraphrased_response']
-            ))
-
-            # Delete oldest if user has more than 10
+            # Keep only last 10 history entries
             cursor.execute("""
                 DELETE FROM history
-                WHERE userID = %s AND hid NOT IN (
+                WHERE userId = %s AND hid NOT IN (
                     SELECT hid FROM (
                         SELECT hid FROM history
-                        WHERE userID = %s
+                        WHERE userId = %s
                         ORDER BY hid DESC
                         LIMIT 10
                     ) AS recent
                 )
             """, (user_id, user_id))
-
             db.commit()
-            cursor.close()
-            db.close()
-            history=getHistory()
+
+            cursor.execute("SELECT filename, content FROM user_files WHERE user_id = %s", (user_id,))
+            uploaded_files = [{'name': row['filename'], 'content': row['content']} for row in cursor.fetchall()]
+            history = getHistory()
+
             return render_template('index.html',
                                    results=results,
                                    query=query,
-                                   uploaded_files=uploaded_files,history=history,
+                                   uploaded_files=uploaded_files,
+                                   history=history,
                                    final_answer=interpret_answer(query, [r['content'] for r in results]))
-    
-    history=getHistory()       
-    return render_template('index.html', uploaded_files=uploaded_files,history=history)
 
+    # GET request fallback
+    cursor.execute("SELECT filename, content FROM user_files WHERE user_id = %s", (user_id,))
+    uploaded_files = [{'name': row['filename'], 'content': row['content']} for row in cursor.fetchall()]
+    history = getHistory()
+    cursor.close()
+    db.close()
+    return render_template('index.html', uploaded_files=uploaded_files, history=history)
+
+
+
+
+'''@app.route('/view/<filename>')
+def view_file(filename):
+    return render_template('viewer.html', filename=filename)'''
+
+'''@app.route('/view/<filename>')
+def view_file(filename):
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=False)'''
 @app.route('/view/<filename>')
 def view_file(filename):
-    return render_template('viewer.html', filename=filename)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    
+    # Check if file exists
+    if not os.path.exists(file_path):
+        return "File not found", 404
+    
+    # Check if file contains a link
+    try:
+        with open(file_path, 'r') as file:
+            content = file.read().strip()
+            
+            if content.startswith('https'):
+                return redirect(content)
+    except:
+        # If no redirection occurred, serve the file normally
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=False)
 
 # return file
 @app.route('/uploads/<filename>')
@@ -445,7 +548,7 @@ def getHistory():
     cursor = db.cursor(dictionary=True) 
 
     user_id = current_user.id
-    cursor.execute("SELECT * FROM history WHERE userID = %s ORDER BY hid DESC", (user_id,))  
+    cursor.execute("SELECT * FROM history WHERE userId = %s ORDER BY hid DESC", (user_id,))  
 
     history = cursor.fetchall()
 
@@ -464,7 +567,7 @@ def viewHistory(hid):
         database=db_name
     )
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM history WHERE hid = %s AND userID = %s", (hid, current_user.id))
+    cursor.execute("SELECT * FROM history WHERE hid = %s AND userId = %s", (hid, current_user.id))
     item = cursor.fetchone()
     cursor.close()
     db.close()

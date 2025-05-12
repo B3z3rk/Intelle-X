@@ -19,6 +19,10 @@
       rel="stylesheet"
       href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
     />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
   </head>
 
   <body class="welcomepage">
@@ -50,6 +54,8 @@
       {% endif %} {% endwith %}
 
       <h1>GET STARTED</h1>
+      <br />
+      <i id="theme" class="fa-solid fa-lightbulb"></i>
 
       <form id="welcome" method="POST" action="{{ url_for('login_view') }}">
         {{ form.hidden_tag() }} {{ form.email.label }}
@@ -75,8 +81,10 @@
         {% endfor %} {{form.submit() }}
       </form>
       <a id="signup" href="{{ url_for('signup') }}">Signup</a>
+      <br />
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <script src="{{url_for('static',filename='script.js')}}" defer></script>
   </body>
 </html>

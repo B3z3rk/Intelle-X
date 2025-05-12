@@ -4,7 +4,11 @@ from bs4 import BeautifulSoup
 
 def read_text_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
-        return file.read()
+        content = file.read().strip()
+        if content.startswith('https') or content.endswith(('.com', '.gov', '.org')):
+            return extract_text_from_url(content)
+        return content
+
 
 def extract_text_from_pdf(pdf_path):
     text = ""
