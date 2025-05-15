@@ -1,3 +1,4 @@
+
 DROP DATABASE IF EXISTS intellexDB;
 CREATE DATABASE IF NOT EXISTS intellexDB;
 
@@ -22,4 +23,14 @@ CREATE TABLE history (
     score FLOAT NOT NULL,
     paraphrased_response TEXT NOT NULL,
     FOREIGN KEY (userID) REFERENCES user(userID) ON DELETE CASCADE
+);
+
+-- Table: user_files
+CREATE TABLE user_files (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT DEFAULT NULL,
+  filename VARCHAR(255) DEFAULT NULL,
+  content LONGTEXT,
+  uploaded_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES user(userID) ON DELETE CASCADE
 );

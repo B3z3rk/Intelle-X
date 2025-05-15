@@ -55,7 +55,7 @@
               href="{{ url_for('viewHistory', hid=item['hid']) }}"
               class="text-white"
             >
-              #{{ item['hid'] }} - {{ item['query'] }}
+              {{ item['query'] }}
             </a>
           </li>
           {% else %}
@@ -75,7 +75,7 @@
 
       <br />
       <!-- File Upload Section -->
-      <form method="POST" enctype="multipart/form-data">
+      <form method="POST" action="/home" enctype="multipart/form-data">
         <div id="file-upload-container">
           <div
             id="file-drop-area"
@@ -110,6 +110,7 @@
         <!-- Sources Section -->
         <div id="sources" class="card">
           <h2>SOURCES</h2>
+          <i id="trash" class="fa-solid fa-trash-can"></i>
           <form method="POST">
             <ul>
               {% for file in uploaded_files %}
@@ -121,7 +122,7 @@
                   id="file-{{ loop.index }}"
                 />
                 <label for="file-{{ loop.index }}">{{ file.name }}</label>
-                <pre>{{ file.content[:10] }}...</pre>
+                <pre>{{ file.content[:20] }}...</pre>
                 <!-- Display first 200 characters -->
               </li>
               {% endfor %}
@@ -175,7 +176,7 @@
       {% if item %}
       <div class="card" id="results">
         <h2>
-          HISTORY RESULT #{{ item.hid }}
+          HISTORY RESULT
           <i
             class="fa-solid fa-eye"
             id="view-icon"

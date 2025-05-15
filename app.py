@@ -2,8 +2,9 @@ from flask import Flask, render_template, request, redirect, url_for,flash, sess
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
 from functools import lru_cache
+from werkzeug.utils import secure_filename
 from bm25_search_engine.bm25.bm25 import BM25
-from bm25_search_engine.bm25.preprocess import preprocess_text
+from bm25_search_engine.bm25.preprocess import preprocess_text,expand_query
 from bm25_search_engine.bm25.file_handlers import read_text_file, extract_text_from_pdf, extract_text_from_url
 from form import LoginForm, SignupForm
 import mysql.connector
@@ -21,6 +22,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import nltk
+import math
 from nltk import sent_tokenize
 from cachetools import TTLCache
 from hashlib import sha256
@@ -258,37 +260,37 @@ stemmer = PorterStemmer()
 
 
 # --- BM25 Improvements ---
-SYNONYM_MAP = {
+'''SYNONYM_MAP = {
     "study": ["research", "experiment"],
     "result": ["finding", "outcome"],
     "theory": ["model", "framework"]
-}
+}'''
 
-def dynamic_bm25_params(doc_lengths):
+'''def dynamic_bm25_params(doc_lengths):
     avg_len = sum(doc_lengths) / len(doc_lengths)
     return {
         'k1': max(1.2, min(2.0, 1.8 * (avg_len / 500))),
         'b': 0.75 if avg_len > 1000 else 0.65
-    }
+    }'''
 
-def expand_query(query):
+'''ef expand_query(query):
     terms = preprocess_text(query).split()
     expanded = []
     for term in terms:
         expanded.append(term)
         expanded.extend(SYNONYM_MAP.get(term, []))
-    return " ".join(expanded)
+    return " ".join(expanded)'''
 
-@lru_cache(maxsize=100)
+'''@lru_cache(maxsize=100)
 def cached_search(query, corpus_indices):
     corpus = [documents_content[i] for i in corpus_indices]
     doc_lengths = [len(doc.split()) for doc in corpus]
     params = dynamic_bm25_params(doc_lengths)
-    engine = BM25(corpus, k1=params['k1'], b=params['b'])
-    return engine.rank_documents(expand_query(preprocess_text(query)))
+    engine = BM25(corpus)
+    return engine.rank_documents(expand_query(preprocess_text(query)))'''
 
 # --- Core Functions ---
-def chunk_text(text, chunk_size=2000):
+def chunk_text(text, chunk_size=600):
     words = text.split()
     return [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
 
@@ -310,7 +312,7 @@ def interpret_answer(query, matching_sections):
     if not matching_sections:
         return "Sorry, I couldn't find any relevant information to answer your question."
 
-    context = " ".join(matching_sections[:3])  # Use top 3 relevant sections
+    context = " ".join(matching_sections[:3]) 
 
     system_prompt = (
         "You are a document-based assistant. Answer the user's question only using the provided context from the documents and the user's question. "
@@ -341,7 +343,13 @@ def generate_query_key(query, corpus_indices):
     key_string = query + "_" + "_".join(map(str, sorted(corpus_indices)))
     return sha256(key_string.encode()).hexdigest()
 
+def normalize_scores(min_score,max_score,score):
+    if max_score == min_score:
+        return 2.0  # avoid division by zero
+    return 2 * (score - min_score) / (max_score - min_score)
 
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
 
 def get_results(query, selected_filenames, uploaded_files, search_engine):
     cache_key = generate_query_key(query, selected_filenames)
@@ -353,34 +361,50 @@ def get_results(query, selected_filenames, uploaded_files, search_engine):
 
 
     # Preprocess query once
-    query_pre = preprocess_text(query)
+    query_pre = expand_query(query)
     query_terms = query_pre.split()
     query_tokens = set(query_terms)
 
     # Get indices of selected documents
     filename_to_index = {f['filename']: i for i, f in enumerate(uploaded_files)}
     corpus_indices = [filename_to_index[fname] for fname in selected_filenames if fname in filename_to_index]
-
+    
     # Score documents using BM25
     ranked_docs = [
         (i, search_engine._compute_bm25_score(query_terms, i))
         for i in corpus_indices
     ]
     ranked_docs = sorted(ranked_docs, key=lambda x: x[1], reverse=True)
+    min_score = min([scr[1] for scr in ranked_docs])
+    max_score = max([scr[1] for scr in ranked_docs])
+
 
     # Collect top 3 matching documents
     results = []
-    for doc_index, score in ranked_docs[:3]:
+    for doc_index, score in ranked_docs:
         full_text = uploaded_files[doc_index]['content']
         sentences = sent_tokenize(full_text)
+
+        #print((doc_index,score))
+
+        #score = normalize_scores(min_score,max_score,score)
 
         # Score each sentence by token overlap
         scored_sentences = [
             (sent, len(query_tokens & set(preprocess_text(sent).split())))
             for sent in sentences
         ]
-        top_sentences = [s for s, _ in nlargest(3, scored_sentences, key=lambda x: x[1])]
-        paraphrased = interpret_answer(query, top_sentences)
+        top_sentences = [s for s, _ in nlargest(5, scored_sentences, key=lambda x: x[1])]
+        if score != 0:
+            paraphrased = interpret_answer(query, top_sentences)
+        else:
+            pass
+        
+
+        if score == 0:
+            top_sentences = ""
+            paraphrased = "I could not find relevant information in the documents."
+       
 
         results.append({
             'doc_index': doc_index,
@@ -391,16 +415,21 @@ def get_results(query, selected_filenames, uploaded_files, search_engine):
             'filename': uploaded_files[doc_index]['filename']
         })
 
+        print(doc_index)
+        print(score)
+        print(top_sentences)
+
     #query_cache[cache_key] = results
     query_cache.put(cache_key, results)
     return results
 
 
-
+search_engines = {}
 # --- Routes ---
 @app.route('/home', methods=['GET', 'POST'])
 @login_required
 def index():
+    selected_filenames_2 = None
     db = mysql.connector.connect(
         user=db_user,
         password=db_pass,
@@ -414,15 +443,15 @@ def index():
             files = request.files.getlist('files')
 
             # Remove old files for this user
-            cursor.execute("DELETE FROM user_files WHERE user_id = %s", (user_id,))
+            #cursor.execute("DELETE FROM user_files WHERE user_id = %s", (user_id,))
 
             for file in files:
                 if file.filename == '':
                     continue
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
                 file.save(file_path)
                 text = read_text_file(file_path) if file.filename.endswith('.txt') else extract_text_from_pdf(file_path)
-
+                #text = preprocess_text(text)
                 cursor.execute("""
                     INSERT INTO user_files (user_id, filename, content)
                     VALUES (%s, %s, %s)
@@ -430,26 +459,54 @@ def index():
 
             db.commit()
             return redirect(url_for('index'))
+        elif request.is_json:
+            data = request.get_json()
+            if data.get("operation") == "delete":
+                selected_filenames = data.get("selected_files", [])
+                for filename in selected_filenames:
+                    cursor.execute("DELETE FROM user_files WHERE user_id = %s AND filename = %s", (user_id, filename))
+                    cursor.execute("DELETE FROM history WHERE userId = %s AND filename = %s", (user_id, filename))
+                    
+                db.commit()
+                return redirect(url_for('index')) 
 
-        elif 'query' in request.form:
+            
+
+        elif 'query' in request.form and request.form.getlist('selected_files'):
             query = request.form['query']
-            selected_filenames = request.form.getlist('selected_files')
-
             cursor.execute("SELECT filename, content FROM user_files WHERE user_id = %s", (user_id,))
             files = cursor.fetchall()
 
             if not files:
                 return render_template('index.html', error="No documents uploaded yet.", uploaded_files=[])
-
-            # Ensure uploaded_files is a list of dictionaries with 'filename' and 'content'
+            
+            selected_filenames = request.form.getlist('selected_files')
+        
+            
             uploaded_files = [{'filename': f['filename'], 'content': f['content']} for f in files]
-
+            filtered_files = [f for f in uploaded_files if f['filename'] in selected_filenames]
             if not any(f['filename'] in selected_filenames for f in uploaded_files):
                 return render_template('index.html', error="No documents selected.", uploaded_files=uploaded_files)
 
-            corpus = [preprocess_text(f['content']) for f in uploaded_files if f['filename'] in selected_filenames]
-            search_engine = BM25(corpus)
-            results = get_results(query, selected_filenames, uploaded_files,search_engine)  # Now correctly formatted
+            if user_id in search_engines and selected_filenames == search_engines[user_id]['filenames']:
+                search_engine = search_engines[user_id]['engine']
+            else:
+                corpus = [preprocess_text(f['content']) for f in filtered_files]
+                #corpus = chunk_text(corpus[0])
+                #corpus = [preprocess_text(f['content']) for f in uploaded_files if f['filename'] in selected_filenames]
+                search_engine = BM25(corpus)
+                search_engines[user_id] = {
+                    'engine': search_engine,
+                    'filenames': selected_filenames
+                }
+            
+            
+            #corpus = [preprocess_text(f['content']) for f in uploaded_files if f['filename'] in selected_filenames]
+            #search_engine = BM25(corpus)
+            #results = get_results(query, selected_filenames, uploaded_files,search_engine)  
+            results = get_results(query, selected_filenames, filtered_files, search_engine)
+        
+
 
             for result in results:
                 cursor.execute("""
@@ -483,6 +540,7 @@ def index():
             uploaded_files = [{'name': row['filename'], 'content': row['content']} for row in cursor.fetchall()]
             history = getHistory()
 
+             
             return render_template('index.html',
                                    results=results,
                                    query=query,
@@ -501,32 +559,27 @@ def index():
 
 
 
-'''@app.route('/view/<filename>')
-def view_file(filename):
-    return render_template('viewer.html', filename=filename)'''
 
-'''@app.route('/view/<filename>')
-def view_file(filename):
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=False)'''
+
 @app.route('/view/<filename>')
 def view_file(filename):
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    
+
     # Check if file exists
     if not os.path.exists(file_path):
         return "File not found", 404
-    
-    # Check if file contains a link
+
     try:
         with open(file_path, 'r') as file:
             content = file.read().strip()
-            
             if content.startswith('https'):
                 return redirect(content)
-    except:
-        # If no redirection occurred, serve the file normally
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=False)
+    except Exception as e:
+        print(f"Error reading file: {e}")
+
+    # Serve the file normally if not a redirect or error
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=False)
+
 
 # return file
 @app.route('/uploads/<filename>')
@@ -556,8 +609,11 @@ def getHistory():
     db.close()
 
     return history
+
+
+    
 #return history item
-@app.route('/history/<int:hid>')
+@app.route('/history/<int:hid>', methods=['GET', 'POST'])
 @login_required
 def viewHistory(hid):
     db = mysql.connector.connect(
@@ -567,15 +623,128 @@ def viewHistory(hid):
         database=db_name
     )
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM history WHERE hid = %s AND userId = %s", (hid, current_user.id))
+
+    cursor.execute("SELECT * FROM history WHERE hid = %s AND userID = %s", (hid, current_user.id))
     item = cursor.fetchone()
+
+    if not item:
+        cursor.close()
+        db.close()
+        return redirect(url_for('index'))
+
+    filename = item['filename']
+    user_id = current_user.id
+
+    if request.method == 'POST':
+        if 'files' in request.files:
+            files = request.files.getlist('files')
+
+            # Remove old files for this user
+            #cursor.execute("DELETE FROM user_files WHERE user_id = %s", (user_id,))
+
+            for file in files:
+                if file.filename == '':
+                    continue
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure(file.filename))
+                file.save(file_path)
+                text = read_text_file(file_path) if file.filename.endswith('.txt') else extract_text_from_pdf(file_path)
+                #text = preprocess_text(text)
+                cursor.execute("""
+                    INSERT INTO user_files (user_id, filename, content)
+                    VALUES (%s, %s, %s)
+                """, (user_id, file.filename, text))
+
+            db.commit()
+            return redirect(url_for('index'))
+        
+        elif request.is_json:
+            data = request.get_json()
+            if data.get("operation") == "delete":
+                selected_filenames = data.get("selected_files", [])
+                for filename in selected_filenames:
+                    cursor.execute("DELETE FROM user_files WHERE user_id = %s AND filename = %s", (user_id, filename))
+                    cursor.execute("DELETE FROM history WHERE userId = %s AND filename = %s", (user_id, filename))
+                    
+                db.commit()
+                return redirect(url_for('index')) 
+        
+        elif 'query' in request.form:
+            new_query = request.form.get('query')
+
+            # Fetch the original document from user_files
+            cursor.execute("""
+                SELECT filename, content FROM user_files
+                WHERE user_id = %s AND filename = %s
+            """, (user_id, filename))
+            file = cursor.fetchone()
+
+            if not file:
+                cursor.close()
+                db.close()
+                return "Original document not found.", 404
+
+            uploaded_files = [{'filename': file['filename'], 'content': file['content']}]
+            '''corpus = [preprocess_text(file['content'])]
+            search_engine = BM25(corpus)
+
+            results = get_results(new_query, [file['filename']], uploaded_files, search_engine)'''
+
+            if user_id in search_engines and uploaded_files == search_engines[user_id]['filenames']:
+                search_engine = search_engines[user_id]['engine']
+            else:
+                corpus = [preprocess_text(file['content'])]
+                #corpus = [preprocess_text(f['content']) for f in uploaded_files if f['filename'] in selected_filenames]
+                search_engine = BM25(corpus)
+                search_engines[user_id] = {
+                    'engine': search_engine,
+                    'filenames': uploaded_files
+                }
+            results = get_results(new_query, [file['filename']], uploaded_files, search_engine)
+
+            for result in results:
+                cursor.execute("""
+                    INSERT INTO history (userId, query, docIndex, filename, score, matching_sections, paraphrased_response)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    user_id,
+                    new_query,
+                    result['doc_index'],
+                    result['filename'],
+                    result['score'],
+                    "; ".join(result['matching_sections']),
+                    result['paraphrased_response']
+                ))
+
+            # Keep last 10
+            cursor.execute("""
+                DELETE FROM history
+                WHERE userId = %s AND hid NOT IN (
+                    SELECT hid FROM (
+                        SELECT hid FROM history WHERE userId = %s ORDER BY hid DESC LIMIT 10
+                    ) AS recent
+                )
+            """, (user_id, user_id))
+
+            db.commit()
+
+        uploaded_files = [{'name': file['filename'], 'content': file['content']}]
+        history = getHistory()
+        cursor.close()
+        db.close()
+
+        return render_template('index.html',
+                               results=results,
+                               query=new_query,
+                               uploaded_files=uploaded_files,
+                               history=history,
+                               final_answer=interpret_answer(new_query, [r['content'] for r in results]))
+
+    # # GET request fallback
+
+    history = getHistory()
     cursor.close()
     db.close()
-    history=getHistory()
-    if not item:
-        return "History item not found or unauthorized.", 404
-
-    return render_template('index.html', item=item,history=history)
+    return render_template('index.html', item=item, history=history)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -118,6 +118,42 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
+document.addEventListener("DOMContentLoaded", function () {
+  const deleteFile = document.getElementById("trash");
+
+  if (deleteFile) {
+    deleteFile.addEventListener("click", () => {
+      const checkedBoxes = document.querySelectorAll(
+        'input[name="selected_files"]:checked'
+      );
+      const selectedFilenames = Array.from(checkedBoxes).map((cb) => cb.value);
+
+      if (selectedFilenames.length === 0) {
+        alert("Please select at least one file to delete.");
+        return;
+      }
+
+      fetch("/home", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          operation: "delete",
+          selected_files: selectedFilenames,
+        }),
+      }).then((response) => {
+        if (response.ok) {
+          console.log("here");
+          location.reload();
+        } else {
+          alert("Error deleting files.");
+        }
+      });
+    });
+  }
+});
+
 //dark mode
 const toggleDarkMode = () => {
   document.body.classList.toggle("dark-mode");
