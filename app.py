@@ -1,14 +1,13 @@
-from flask import Flask, render_template, request, redirect, url_for,flash, session,send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory,jsonify
+from markupsafe import escape
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
-from functools import lru_cache
 from werkzeug.utils import secure_filename
 from bm25_search_engine.bm25.bm25 import BM25
 from bm25_search_engine.bm25.preprocess import preprocess_text,expand_query
-from bm25_search_engine.bm25.file_handlers import read_text_file, extract_text_from_pdf, extract_text_from_url
+from bm25_search_engine.bm25.file_handlers import read_text_file, extract_text_from_pdf
 from form import LoginForm, SignupForm
 import mysql.connector
-from mysql.connector import Error
 from itsdangerous import URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_login import  LoginManager, login_user, logout_user, current_user, login_required
@@ -16,27 +15,12 @@ from model import User
 import traceback
 import os
 from openai import OpenAI
-from transformers import pipeline
-from sentence_transformers import CrossEncoder
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
-import nltk
-import math
+from collections import OrderedDict
 from nltk import sent_tokenize
-from cachetools import TTLCache
 from hashlib import sha256
-
 from heapq import nlargest
-from collections import defaultdict
 
 
-
-
-# Download NLTK stopwords (run once)
-nltk.download('stopwords')
-nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger_eng')
 
 # Load environment variables
 load_dotenv()
@@ -64,9 +48,7 @@ db_pass = os.getenv('MYSQL_PASSWORD')
 db_host = os.getenv('MYSQL_HOST')
 db_name = os.getenv('MYSQL_DB')
 
-# Cache up to 100 queries, each expires after 50 minutes (3000 seconds)
-#query_cache = TTLCache(maxsize=100, ttl=3000)
-from collections import OrderedDict
+
 
 class LRUCache:
     def __init__(self, capacity=1000):
@@ -89,9 +71,6 @@ class LRUCache:
 query_cache = LRUCache(capacity=500)
 
 
-# Set up OpenAI API Key
-#api_key=os.environ.get("OPENAI_API_KEY")
-#openai.api_key = os.getenv("OPENAI_API_KEY")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 if not client:
@@ -247,66 +226,8 @@ def verify_email(token):
     return redirect(url_for("login_view"))
 
 
-# --- Global Variables ---
-search_engine = None
-documents_content = []
-'''uploaded_files = []'''
-stop_words = set(stopwords.words('english'))
-stemmer = PorterStemmer()
-
-# --- Model Initialization ---
-# intent_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-# reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
-
-
-# --- BM25 Improvements ---
-'''SYNONYM_MAP = {
-    "study": ["research", "experiment"],
-    "result": ["finding", "outcome"],
-    "theory": ["model", "framework"]
-}'''
-
-'''def dynamic_bm25_params(doc_lengths):
-    avg_len = sum(doc_lengths) / len(doc_lengths)
-    return {
-        'k1': max(1.2, min(2.0, 1.8 * (avg_len / 500))),
-        'b': 0.75 if avg_len > 1000 else 0.65
-    }'''
-
-'''ef expand_query(query):
-    terms = preprocess_text(query).split()
-    expanded = []
-    for term in terms:
-        expanded.append(term)
-        expanded.extend(SYNONYM_MAP.get(term, []))
-    return " ".join(expanded)'''
-
-'''@lru_cache(maxsize=100)
-def cached_search(query, corpus_indices):
-    corpus = [documents_content[i] for i in corpus_indices]
-    doc_lengths = [len(doc.split()) for doc in corpus]
-    params = dynamic_bm25_params(doc_lengths)
-    engine = BM25(corpus)
-    return engine.rank_documents(expand_query(preprocess_text(query)))'''
 
 # --- Core Functions ---
-def chunk_text(text, chunk_size=600):
-    words = text.split()
-    return [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
-
-def highlight_matches(text, query):
-    query_terms = [stemmer.stem(term) for term in word_tokenize(query.lower()) if term not in stop_words]
-    matching_sections = []
-    for sentence in text.split('. '):
-        stemmed_sentence = [stemmer.stem(word) for word in word_tokenize(sentence.lower())]
-        if any(term in stemmed_sentence for term in query_terms):
-            for term in query_terms:
-                original_term = next((word for word in word_tokenize(sentence.lower()) 
-                                    if stemmer.stem(word) == term), None)
-                if original_term:
-                    sentence = sentence.replace(original_term, f"<strong>{original_term}</strong>")
-            matching_sections.append(sentence)
-    return matching_sections
 
 def interpret_answer(query, matching_sections):
     if not matching_sections:
@@ -343,13 +264,6 @@ def generate_query_key(query, corpus_indices):
     key_string = query + "_" + "_".join(map(str, sorted(corpus_indices)))
     return sha256(key_string.encode()).hexdigest()
 
-def normalize_scores(min_score,max_score,score):
-    if max_score == min_score:
-        return 2.0  # avoid division by zero
-    return 2 * (score - min_score) / (max_score - min_score)
-
-def sigmoid(x):
-    return 1 / (1 + math.exp(-x))
 
 def get_results(query, selected_filenames, uploaded_files, search_engine):
     cache_key = generate_query_key(query, selected_filenames)
@@ -385,9 +299,6 @@ def get_results(query, selected_filenames, uploaded_files, search_engine):
         full_text = uploaded_files[doc_index]['content']
         sentences = sent_tokenize(full_text)
 
-        #print((doc_index,score))
-
-        #score = normalize_scores(min_score,max_score,score)
 
         # Score each sentence by token overlap
         scored_sentences = [
@@ -415,11 +326,7 @@ def get_results(query, selected_filenames, uploaded_files, search_engine):
             'filename': uploaded_files[doc_index]['filename']
         })
 
-        print(doc_index)
-        print(score)
-        print(top_sentences)
 
-    #query_cache[cache_key] = results
     query_cache.put(cache_key, results)
     return results
 
@@ -429,7 +336,6 @@ search_engines = {}
 @app.route('/home', methods=['GET', 'POST'])
 @login_required
 def index():
-    selected_filenames_2 = None
     db = mysql.connector.connect(
         user=db_user,
         password=db_pass,
@@ -442,16 +348,12 @@ def index():
         if 'files' in request.files:
             files = request.files.getlist('files')
 
-            # Remove old files for this user
-            #cursor.execute("DELETE FROM user_files WHERE user_id = %s", (user_id,))
-
             for file in files:
                 if file.filename == '':
                     continue
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
                 file.save(file_path)
                 text = read_text_file(file_path) if file.filename.endswith('.txt') else extract_text_from_pdf(file_path)
-                #text = preprocess_text(text)
                 cursor.execute("""
                     INSERT INTO user_files (user_id, filename, content)
                     VALUES (%s, %s, %s)
@@ -466,14 +368,14 @@ def index():
                 for filename in selected_filenames:
                     cursor.execute("DELETE FROM user_files WHERE user_id = %s AND filename = %s", (user_id, filename))
                     cursor.execute("DELETE FROM history WHERE userId = %s AND filename = %s", (user_id, filename))
-                    
-                db.commit()
-                return redirect(url_for('index')) 
 
+                db.commit()
+                return redirect(url_for('index'))
             
 
         elif 'query' in request.form and request.form.getlist('selected_files'):
-            query = request.form['query']
+            raw_query = request.form['query']
+            query = escape(raw_query.strip())
             cursor.execute("SELECT filename, content FROM user_files WHERE user_id = %s", (user_id,))
             files = cursor.fetchall()
 
@@ -492,8 +394,6 @@ def index():
                 search_engine = search_engines[user_id]['engine']
             else:
                 corpus = [preprocess_text(f['content']) for f in filtered_files]
-                #corpus = chunk_text(corpus[0])
-                #corpus = [preprocess_text(f['content']) for f in uploaded_files if f['filename'] in selected_filenames]
                 search_engine = BM25(corpus)
                 search_engines[user_id] = {
                     'engine': search_engine,
@@ -501,9 +401,6 @@ def index():
                 }
             
             
-            #corpus = [preprocess_text(f['content']) for f in uploaded_files if f['filename'] in selected_filenames]
-            #search_engine = BM25(corpus)
-            #results = get_results(query, selected_filenames, uploaded_files,search_engine)  
             results = get_results(query, selected_filenames, filtered_files, search_engine)
         
 
@@ -638,14 +535,10 @@ def viewHistory(hid):
     if request.method == 'POST':
         if 'files' in request.files:
             files = request.files.getlist('files')
-
-            # Remove old files for this user
-            #cursor.execute("DELETE FROM user_files WHERE user_id = %s", (user_id,))
-
             for file in files:
                 if file.filename == '':
                     continue
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure(file.filename))
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
                 file.save(file_path)
                 text = read_text_file(file_path) if file.filename.endswith('.txt') else extract_text_from_pdf(file_path)
                 #text = preprocess_text(text)
@@ -669,7 +562,8 @@ def viewHistory(hid):
                 return redirect(url_for('index')) 
         
         elif 'query' in request.form:
-            new_query = request.form.get('query')
+            raw_query = request.form['query']
+            new_query = escape(raw_query.strip())
 
             # Fetch the original document from user_files
             cursor.execute("""
@@ -693,7 +587,6 @@ def viewHistory(hid):
                 search_engine = search_engines[user_id]['engine']
             else:
                 corpus = [preprocess_text(file['content'])]
-                #corpus = [preprocess_text(f['content']) for f in uploaded_files if f['filename'] in selected_filenames]
                 search_engine = BM25(corpus)
                 search_engines[user_id] = {
                     'engine': search_engine,

@@ -144,7 +144,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }),
       }).then((response) => {
         if (response.ok) {
-          console.log("here");
           location.reload();
         } else {
           alert("Error deleting files.");

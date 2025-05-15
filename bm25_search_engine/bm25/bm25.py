@@ -6,7 +6,6 @@ from .preprocess import preprocess_text, expand_query
 
 class BM25:
     def __init__(self, corpus):
-        print(corpus)
         self.corpus = corpus
         self.doc_lengths = [len(doc.split()) for doc in corpus]
         self.avgdl = sum(self.doc_lengths) / len(corpus) if corpus else 0
@@ -56,12 +55,4 @@ class BM25:
             score += self.idf[term] * (numerator / denominator)
             
         return score
-
-    def rank_documents(self, query):
-        query_terms = query.split()
-        return sorted(
-            ((i, self._compute_bm25_score(query_terms, i)) for i in range(len(self.corpus))),
-            key=lambda x: x[1],
-            reverse=True
-        )
 
